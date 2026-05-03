@@ -17,6 +17,34 @@ The script reads MAME XML and software-list XML, indexes ZIP/7z archives with
 
 Current implementation supports `--merge-mode merged`.
 
+## qBittorrent File Selection
+
+`mame_rebuild.py --torrent-plan` creates a wanted file list.  Apply it to an
+already-added qBittorrent torrent with:
+
+```bash
+./qb_select_wanted.py \
+  --url http://localhost:8080 \
+  --user admin \
+  --password 'password' \
+  --hash TORRENT_HASH \
+  --wanted work_mame/reports/torrent_wanted_files.txt \
+  --dry-run
+```
+
+When the dry run looks right, omit `--dry-run`.  Add `--resume` to start the
+torrent after priorities are applied.  The tool first sets all torrent files to
+priority `0`, then sets wanted files to priority `1`.
+
+This helper only controls an existing qBittorrent torrent.  It does not fetch
+metadata from magnet links and does not download files by itself.
+
+## Structure
+
+- `mame_rebuild.py`: MAME audit/rebuild CLI.
+- `qb_select_wanted.py`: qBittorrent file priority CLI.
+- `mame_manager/qbittorrent.py`: qBittorrent Web API adapter and file matching.
+
 ## Safety
 
 - `--scan-only` is read-only.
