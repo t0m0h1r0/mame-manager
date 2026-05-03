@@ -11,6 +11,7 @@ The script reads MAME XML and software-list XML, indexes ZIP/7z archives with
 ```bash
 ./mame_rebuild.py --scan-only --skip-xml --scan-jobs 8
 ./mame_rebuild.py --rebuild-plan-only --skip-xml --scan-jobs 8
+./mame_rebuild.py --scan-only --skip-xml --torrent-plan torrent_file_list.txt
 ./mame_rebuild.py --skip-xml --merge-mode merged --no-qnap
 ```
 
@@ -41,3 +42,6 @@ Important files include:
 - `arcade_incomplete_sets.txt`
 - `software_incomplete_sets.txt`
 - `archive_errors.txt`
+- `torrent_wanted_files.txt`
+- `torrent_unmatched_targets.txt`
+- `torrent_target_map.tsv`

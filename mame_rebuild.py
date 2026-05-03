@@ -111,6 +111,7 @@ class Config:
     compress_jobs: int
     scan_only: bool
     rebuild_plan_only: bool
+    torrent_plan: Path | None
     skip_xml: bool
     no_qnap: bool
     rebuild_mode: str
@@ -617,6 +618,125 @@ class Auditor:
         }
 
 
+class TorrentPlanner:
+    def __init__(self, cfg: Config, report: ReportManager):
+        self.cfg = cfg
+        self.report = report
+
+    def plan(self, missing_roms: dict[str, list[str]], archive_errors: list[str]) -> None:
+        if not self.cfg.torrent_plan:
+            return
+        torrent_files = self._read_torrent_file_list(self.cfg.torrent_plan)
+        torrent_by_basename = defaultdict(list)
+        torrent_by_norm = {}
+        for item in torrent_files:
+            norm = self._norm(item)
+            torrent_by_norm[norm] = item
+            torrent_by_basename[Path(norm).name].append(item)
+
+        targets = self._missing_targets(missing_roms)
+        broken_names = self._broken_archive_names(archive_errors)
+        wanted = []
+        unmatched = []
+        mapping = ["target\ttorrent_file"]
+
+        for target in sorted(targets):
+            matches = self._matches_for_target(target, torrent_by_basename, torrent_by_norm)
+            if matches:
+                for match in matches:
+                    wanted.append(match)
+                    mapping.append(f"{target}\t{match}")
+            else:
+                unmatched.append(target)
+
+        broken_matches = []
+        broken_unmatched = []
+        for name in sorted(broken_names):
+            matches = torrent_by_basename.get(name, [])
+            if matches:
+                broken_matches.extend(matches)
+            else:
+                broken_unmatched.append(name)
+
+        wanted_unique = sorted(set(wanted))
+        broken_unique = sorted(set(broken_matches))
+        self.report.write("torrent_wanted_files.txt", wanted_unique)
+        self.report.write("torrent_unmatched_targets.txt", unmatched)
+        self.report.write("torrent_target_map.tsv", mapping)
+        self.report.write("torrent_broken_archive_wanted_files.txt", broken_unique)
+        self.report.write("torrent_broken_archive_unmatched.txt", broken_unmatched)
+        self.report.summary["torrent_plan"] = {
+            "source_file_count": len(torrent_files),
+            "missing_targets": len(targets),
+            "wanted_files": len(wanted_unique),
+            "unmatched_targets": len(unmatched),
+            "broken_archive_wanted_files": len(broken_unique),
+            "broken_archive_unmatched": len(broken_unmatched),
+        }
+
+    def _read_torrent_file_list(self, path: Path) -> list[str]:
+        if not path.exists():
+            raise FatalError(f"torrent file list not found: {path}")
+        rows = []
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            item = line.strip()
+            if not item or item.startswith("#"):
+                continue
+            rows.append(item)
+        return rows
+
+    @staticmethod
+    def _norm(path: str) -> str:
+        return path.strip().replace("\\", "/").lstrip("./")
+
+    @staticmethod
+    def _missing_targets(missing_roms: dict[str, list[str]]) -> set[str]:
+        targets = set()
+        for rows in missing_roms.values():
+            for row in rows:
+                target = row.split(":", 1)[0].strip()
+                if target:
+                    targets.add(target)
+        return targets
+
+    @staticmethod
+    def _broken_archive_names(archive_errors: list[str]) -> set[str]:
+        names = set()
+        for row in archive_errors:
+            path = row.split(":", 1)[0].strip()
+            if path:
+                names.add(Path(path).name)
+        return names
+
+    def _matches_for_target(
+        self,
+        target: str,
+        torrent_by_basename: dict[str, list[str]],
+        torrent_by_norm: dict[str, str],
+    ) -> list[str]:
+        target_norm = self._norm(target)
+        target_path = Path(target_norm)
+        stem = target_path.stem
+        exts = [".zip", ".7z"]
+        candidate_suffixes = []
+        if target_norm.startswith("roms/"):
+            candidate_suffixes.extend([f"{stem}{ext}" for ext in exts])
+        else:
+            parent = target_path.parent.as_posix()
+            candidate_suffixes.extend([f"{parent}/{stem}{ext}" for ext in exts])
+            candidate_suffixes.extend([f"{stem}{ext}" for ext in exts])
+
+        matches = []
+        for suffix in candidate_suffixes:
+            basename = Path(suffix).name
+            matches.extend(torrent_by_basename.get(basename, []))
+            norm_suffix = self._norm(suffix)
+            for norm, original in torrent_by_norm.items():
+                if norm == norm_suffix or norm.endswith("/" + norm_suffix):
+                    matches.append(original)
+        return sorted(set(matches))
+
+
 class ChdCache:
     def __init__(self, cfg: Config, shell: Shell, report: ReportManager):
         self.cfg = cfg
@@ -969,7 +1089,7 @@ class Validator:
         self.cfg.new.mkdir(parents=True, exist_ok=True)
         if not self.cfg.skip_xml and not self.cfg.mame_bin.exists():
             raise FatalError(f"MAME binary not found: {self.cfg.mame_bin}")
-        read_only = self.cfg.scan_only or self.cfg.rebuild_plan_only
+        read_only = self.cfg.scan_only or self.cfg.rebuild_plan_only or bool(self.cfg.torrent_plan)
         for exe, needed in ((self.cfg.sevenz_bin, True), (self.cfg.rsync_bin, not read_only)):
             if needed and not Shell.executable_exists(exe):
                 raise FatalError(f"required executable not found: {exe}")
@@ -1014,7 +1134,10 @@ class MameRebuildApp:
             archives = indexer.index_all()
             inventory = Inventory(archives)
             self.report.phase("audit ROMs")
-            Auditor(self.cfg, self.report).audit_roms(index, inventory)
+            missing_roms = Auditor(self.cfg, self.report).audit_roms(index, inventory)
+            if self.cfg.torrent_plan:
+                self.report.phase("plan torrent files")
+                TorrentPlanner(self.cfg, self.report).plan(missing_roms, inventory.bad_archives)
             self.report.phase("scan CHDs")
             chds = ChdCache(self.cfg, self.shell, self.report).scan()
             assets = AssetManager(self.cfg, self.report)
@@ -1067,6 +1190,7 @@ def parse_args(argv: list[str]) -> Config:
     parser = argparse.ArgumentParser(description="Python-only MAME images auditor/rebuilder.")
     parser.add_argument("--scan-only", action="store_true")
     parser.add_argument("--rebuild-plan-only", action="store_true")
+    parser.add_argument("--torrent-plan", type=Path, default=None, metavar="FILE_LIST")
     parser.add_argument("--skip-xml", action="store_true")
     parser.add_argument("--no-qnap", action="store_true")
     parser.add_argument("--mame-bin", type=Path, default=Path("mame/mame"))
@@ -1109,6 +1233,7 @@ def parse_args(argv: list[str]) -> Config:
         compress_jobs=args.compress_jobs,
         scan_only=args.scan_only,
         rebuild_plan_only=args.rebuild_plan_only,
+        torrent_plan=args.torrent_plan,
         skip_xml=args.skip_xml,
         no_qnap=args.no_qnap,
         rebuild_mode=args.rebuild_mode,
