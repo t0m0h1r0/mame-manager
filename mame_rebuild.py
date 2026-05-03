@@ -110,6 +110,7 @@ class Config:
     scan_jobs: int
     compress_jobs: int
     scan_only: bool
+    rebuild_plan_only: bool
     skip_xml: bool
     no_qnap: bool
     rebuild_mode: str
@@ -202,6 +203,7 @@ class ReportManager:
             "version": VERSION,
             "started_at": now_iso(),
             "scan_only": cfg.scan_only,
+            "rebuild_plan_only": cfg.rebuild_plan_only,
             "merge_mode": cfg.merge_mode,
             "engine": "python-only",
             "notes": [],
@@ -535,22 +537,84 @@ class Auditor:
         self.report = report
 
     def audit_roms(self, index: DatIndex, inventory: Inventory) -> dict[str, list[str]]:
-        missing_arcade = self._missing_for_targets(index.arcade_targets, inventory)
-        missing_software = self._missing_for_targets(index.software_targets, inventory)
-        self.report.write("arcade_missing_roms.txt", missing_arcade)
-        self.report.write("software_missing_roms.txt", missing_software)
+        arcade = self._audit_targets(index.arcade_targets, inventory)
+        software = self._audit_targets(index.software_targets, inventory)
+        self.report.write("arcade_missing_roms.txt", arcade["missing_entries"])
+        self.report.write("software_missing_roms.txt", software["missing_entries"])
+        self.report.write("arcade_complete_sets.txt", arcade["complete_sets"])
+        self.report.write("software_complete_sets.txt", software["complete_sets"])
+        self.report.write("arcade_incomplete_sets.txt", arcade["incomplete_sets"])
+        self.report.write("software_incomplete_sets.txt", software["incomplete_sets"])
         self.report.write("archive_errors.txt", inventory.bad_archives)
-        self.report.summary["missing_rom_entries"] = {"arcade": len(missing_arcade), "software": len(missing_software)}
+        self.report.summary["rom_sets"] = {
+            "arcade": {
+                "total": arcade["total_sets"],
+                "complete": len(arcade["complete_sets"]),
+                "incomplete": len(arcade["incomplete_sets"]),
+            },
+            "software": {
+                "total": software["total_sets"],
+                "complete": len(software["complete_sets"]),
+                "incomplete": len(software["incomplete_sets"]),
+            },
+            "combined": {
+                "total": arcade["total_sets"] + software["total_sets"],
+                "complete": len(arcade["complete_sets"]) + len(software["complete_sets"]),
+                "incomplete": len(arcade["incomplete_sets"]) + len(software["incomplete_sets"]),
+            },
+        }
+        self.report.summary["rom_file_entries"] = {
+            "arcade": {
+                "total": arcade["total_entries"],
+                "present": arcade["present_entries"],
+                "missing": len(arcade["missing_entries"]),
+            },
+            "software": {
+                "total": software["total_entries"],
+                "present": software["present_entries"],
+                "missing": len(software["missing_entries"]),
+            },
+            "combined": {
+                "total": arcade["total_entries"] + software["total_entries"],
+                "present": arcade["present_entries"] + software["present_entries"],
+                "missing": len(arcade["missing_entries"]) + len(software["missing_entries"]),
+            },
+        }
+        self.report.summary["missing_rom_entries"] = {
+            "arcade": len(arcade["missing_entries"]),
+            "software": len(software["missing_entries"]),
+        }
         self.report.summary["archive_errors"] = len(inventory.bad_archives)
-        return {"arcade": missing_arcade, "software": missing_software}
+        return {"arcade": arcade["missing_entries"], "software": software["missing_entries"]}
 
-    def _missing_for_targets(self, targets: dict[str, dict[str, Any]], inventory: Inventory) -> list[str]:
-        missing = []
+    def _audit_targets(self, targets: dict[str, dict[str, Any]], inventory: Inventory) -> dict[str, Any]:
+        missing_entries = []
+        complete_sets = []
+        incomplete_sets = []
+        total_entries = 0
+        present_entries = 0
         for rel, target in sorted(targets.items()):
+            target_missing = []
             for entry in target["entries"]:
+                total_entries += 1
                 if not inventory.candidates(entry):
-                    missing.append(f"{rel}: {entry['name']} size={entry['size']} crc={entry['crc']}")
-        return missing
+                    line = f"{rel}: {entry['name']} size={entry['size']} crc={entry['crc']}"
+                    missing_entries.append(line)
+                    target_missing.append(line)
+                else:
+                    present_entries += 1
+            if target_missing:
+                incomplete_sets.append(f"{rel}: missing {len(target_missing)}/{len(target['entries'])}")
+            else:
+                complete_sets.append(rel)
+        return {
+            "total_sets": len(targets),
+            "total_entries": total_entries,
+            "present_entries": present_entries,
+            "missing_entries": missing_entries,
+            "complete_sets": complete_sets,
+            "incomplete_sets": incomplete_sets,
+        }
 
 
 class ChdCache:
@@ -726,6 +790,30 @@ class Rebuilder:
             },
         )
 
+    def plan(self, index: DatIndex, inventory: Inventory) -> dict[str, int]:
+        reusable = []
+        buildable = []
+        missing = []
+        for rel, target in sorted(index.all_targets().items()):
+            if self._can_reuse_existing(rel, target):
+                reusable.append(rel)
+                continue
+            missing_entries = [
+                f"{entry['name']} size={entry['size']} crc={entry['crc']}"
+                for entry in target["entries"]
+                if not inventory.candidates(entry)
+            ]
+            if missing_entries:
+                missing.append(f"{rel}: " + "; ".join(missing_entries[:10]))
+            else:
+                buildable.append(rel)
+        self.report.write("rebuild_plan_reusable.txt", reusable)
+        self.report.write("rebuild_plan_buildable.txt", buildable)
+        self.report.write("rebuild_plan_missing.txt", missing)
+        result = {"reusable": len(reusable), "buildable": len(buildable), "missing": len(missing)}
+        self.report.summary["rebuild_plan"] = result
+        return result
+
     def _action(self, manifest_hash: str, input_fp: str, dat_hash: str) -> str:
         if self.cfg.rebuild_mode != "auto":
             return self.cfg.rebuild_mode
@@ -739,11 +827,7 @@ class Rebuilder:
         return "full"
 
     def _reuse_existing(self, rel: str, target: dict[str, Any]) -> bool:
-        rel_path = Path(rel)
-        if rel_path.parts[0] == "roms":
-            src = self.cfg.images / "roms" / rel_path.name
-        else:
-            src = self.cfg.images / rel
+        src = self._existing_path(rel)
         if not src.exists():
             return False
         rec = self.indexer.index_one(src)
@@ -754,6 +838,19 @@ class Rebuilder:
         shutil.copy2(src, dst)
         self.reused += 1
         return True
+
+    def _can_reuse_existing(self, rel: str, target: dict[str, Any]) -> bool:
+        src = self._existing_path(rel)
+        if not src.exists():
+            return False
+        rec = self.indexer.index_one(src)
+        return archive_matches_target(rec, target)
+
+    def _existing_path(self, rel: str) -> Path:
+        rel_path = Path(rel)
+        if rel_path.parts[0] == "roms":
+            return self.cfg.images / "roms" / rel_path.name
+        return self.cfg.images / rel
 
     def _build_target(self, rel: str, target: dict[str, Any], inventory: Inventory) -> tuple[bool, str]:
         staging = self.cfg.raw / rel.replace("/", "__").replace(".7z", "")
@@ -872,10 +969,11 @@ class Validator:
         self.cfg.new.mkdir(parents=True, exist_ok=True)
         if not self.cfg.skip_xml and not self.cfg.mame_bin.exists():
             raise FatalError(f"MAME binary not found: {self.cfg.mame_bin}")
-        for exe, needed in ((self.cfg.sevenz_bin, True), (self.cfg.rsync_bin, not self.cfg.scan_only)):
+        read_only = self.cfg.scan_only or self.cfg.rebuild_plan_only
+        for exe, needed in ((self.cfg.sevenz_bin, True), (self.cfg.rsync_bin, not read_only)):
             if needed and not Shell.executable_exists(exe):
                 raise FatalError(f"required executable not found: {exe}")
-        if not self.cfg.scan_only and not self.cfg.no_qnap and not self.cfg.rsync_pass.exists():
+        if not read_only and not self.cfg.no_qnap and not self.cfg.rsync_pass.exists():
             raise FatalError(f"rsync password file not found: {self.cfg.rsync_pass}")
 
 
@@ -924,6 +1022,11 @@ class MameRebuildApp:
                 assets.report_chds(index, chds)
                 assets.report_samples(index.samples)
                 self._write_scan_cache(dat_hash, fp["sha256"], manifest_hash)
+            elif self.cfg.rebuild_plan_only:
+                self.report.phase("plan rebuild")
+                Rebuilder(self.cfg, self.shell, self.report, indexer).plan(index, inventory)
+                assets.report_chds(index, chds)
+                assets.report_samples(index.samples)
             else:
                 if inventory.bad_archives:
                     raise FatalError(f"{len(inventory.bad_archives)} archive(s) failed 7z indexing; refusing rebuild")
@@ -963,6 +1066,7 @@ class MameRebuildApp:
 def parse_args(argv: list[str]) -> Config:
     parser = argparse.ArgumentParser(description="Python-only MAME images auditor/rebuilder.")
     parser.add_argument("--scan-only", action="store_true")
+    parser.add_argument("--rebuild-plan-only", action="store_true")
     parser.add_argument("--skip-xml", action="store_true")
     parser.add_argument("--no-qnap", action="store_true")
     parser.add_argument("--mame-bin", type=Path, default=Path("mame/mame"))
@@ -1004,6 +1108,7 @@ def parse_args(argv: list[str]) -> Config:
         scan_jobs=args.scan_jobs,
         compress_jobs=args.compress_jobs,
         scan_only=args.scan_only,
+        rebuild_plan_only=args.rebuild_plan_only,
         skip_xml=args.skip_xml,
         no_qnap=args.no_qnap,
         rebuild_mode=args.rebuild_mode,
