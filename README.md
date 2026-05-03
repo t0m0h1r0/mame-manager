@@ -9,17 +9,17 @@ The script reads MAME XML and software-list XML, indexes ZIP/7z archives with
 ## Basic Usage
 
 ```bash
-./mame_rebuild.py --scan-only --skip-xml --scan-jobs 8
-./mame_rebuild.py --rebuild-plan-only --skip-xml --scan-jobs 8
-./mame_rebuild.py --scan-only --skip-xml --torrent-plan torrent_file_list.txt
-./mame_rebuild.py --skip-xml --merge-mode merged --no-qnap
+./mame_manager.py --scan-only --skip-xml --scan-jobs 8
+./mame_manager.py --rebuild-plan-only --skip-xml --scan-jobs 8
+./mame_manager.py --scan-only --skip-xml --torrent-plan torrent_file_list.txt
+./mame_manager.py --skip-xml --merge-mode merged --no-qnap
 ```
 
 Current implementation supports `--merge-mode merged`.
 
 ## qBittorrent File Selection
 
-`mame_rebuild.py --torrent-plan` creates a wanted file list.  Apply it to an
+`mame_manager.py --torrent-plan` creates a wanted file list.  Apply it to an
 already-added qBittorrent torrent with:
 
 ```bash
@@ -43,7 +43,7 @@ metadata from magnet links and does not download files by itself.
 
 ## Structure
 
-- `mame_rebuild.py`: Thin CLI entry point for the rebuild workflow.
+- `mame_manager.py`: Thin CLI entry point for the rebuild workflow.
 - `mame_manager/rebuild/cli.py`: Argument parsing and configuration assembly.
 - `mame_manager/rebuild/app.py`: Top-level workflow orchestration.
 - `mame_manager/rebuild/config.py`, `common.py`, `shell.py`, `report.py`: Shared configuration, utility, command, and report infrastructure.
