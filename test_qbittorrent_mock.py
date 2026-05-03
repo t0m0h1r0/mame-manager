@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -75,71 +76,78 @@ class Handler(BaseHTTPRequestHandler):
         return
 
 
+def write_fixture(root: Path) -> tuple[Path, Path, Path, Path]:
+    images = root / "images"
+    new = root / "new"
+    work = root / "work_mame"
+    root.mkdir(parents=True)
+    images.mkdir()
+    new.mkdir()
+    work.mkdir()
+    (work / "mame.xml").write_text(
+        """<?xml version="1.0"?>
+<mame>
+  <machine name="100in1rg"><rom name="a.bin" size="1" crc="11111111"/></machine>
+  <machine name="bloodstm"><rom name="b.bin" size="1" crc="22222222"/></machine>
+  <machine name="missing"><rom name="c.bin" size="1" crc="33333333"/></machine>
+</mame>
+""",
+        encoding="utf-8",
+    )
+    (work / "software.xml").write_text("<softwarelists/>\n", encoding="utf-8")
+    sevenz = root / "7z"
+    sevenz.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    sevenz.chmod(0o755)
+    return images, new, work, sevenz
+
+
+def run_manager(root: Path, url: str, *extra: str) -> subprocess.CompletedProcess[str]:
+    images, new, work, sevenz = write_fixture(root)
+    env = os.environ.copy()
+    env["QBITTORRENT_PASSWORD"] = "secret"
+    return subprocess.run(
+        [
+            sys.executable,
+            "mame_manager.py",
+            "--scan-only",
+            "--skip-xml",
+            "--images",
+            str(images),
+            "--new",
+            str(new),
+            "--work",
+            str(work),
+            "--7z-bin",
+            str(sevenz),
+            "--qbittorrent-url",
+            url,
+            "--qbittorrent-user",
+            "admin",
+            *extra,
+        ],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=True,
+    )
+
+
 def main() -> int:
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     url = f"http://127.0.0.1:{server.server_port}"
     with tempfile.TemporaryDirectory() as td:
-        wanted = Path(td) / "wanted.txt"
-        wanted.write_text(
-            "\n".join(
-                [
-                    "MAME 0.287 ROMs (merged)/100in1rg.zip",
-                    "bloodstm.zip",
-                    "missing.zip",
-                ]
-            )
-            + "\n"
-        )
-        dry = subprocess.run(
-            [
-                sys.executable,
-                "qb_select_wanted.py",
-                "--url",
-                url,
-                "--user",
-                "admin",
-                "--password",
-                "secret",
-                "--hash",
-                "abc123",
-                "--wanted",
-                str(wanted),
-                "--dry-run",
-            ],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-        assert "selected files: 2" in dry.stdout
-        assert "unmatched wanted paths: 1" in dry.stdout
+        root = Path(td)
+        dry = run_manager(root / "dry", url, "--qbittorrent-hash", "abc123", "--qbittorrent-dry-run")
+        assert "qBittorrent selected files: 2/3" in dry.stdout
+        assert "qBittorrent unmatched wanted files: 0" in dry.stdout
         assert not any(path == "/api/v2/torrents/filePrio" for path, _ in REQUESTS)
 
         REQUESTS.clear()
-        real = subprocess.run(
-            [
-                sys.executable,
-                "qb_select_wanted.py",
-                "--url",
-                url,
-                "--user",
-                "admin",
-                "--password",
-                "secret",
-                "--hash",
-                "abc123",
-                "--wanted",
-                str(wanted),
-                "--resume",
-            ],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-        assert "selected files: 2" in real.stdout
+        real = run_manager(root / "real", url, "--qbittorrent-hash", "abc123", "--qbittorrent-resume")
+        assert "qBittorrent selected files: 2/3" in real.stdout
         file_prio = [(path, fields) for path, fields in REQUESTS if path == "/api/v2/torrents/filePrio"]
         assert len(file_prio) == 2, REQUESTS
         assert file_prio[0][1]["id"] == ["0|1|2"]
@@ -149,31 +157,11 @@ def main() -> int:
         assert any(path == "/api/v2/torrents/resume" for path, _ in REQUESTS)
 
         REQUESTS.clear()
-        auto = subprocess.run(
-            [
-                sys.executable,
-                "qb_select_wanted.py",
-                "--url",
-                url,
-                "--user",
-                "admin",
-                "--password",
-                "secret",
-                "--wanted",
-                str(wanted),
-                "--torrent-name",
-                "MAME",
-                "--dry-run",
-            ],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-        assert "torrent hash: abc123" in auto.stdout
-        assert "selected files: 2" in auto.stdout
+        auto = run_manager(root / "auto", url, "--qbittorrent-name", "MAME", "--qbittorrent-dry-run")
+        assert "qBittorrent torrent: MAME 0.287 ROMs (merged) (abc123)" in auto.stdout
+        assert "qBittorrent selected files: 2/3" in auto.stdout
     server.shutdown()
-    print("mock qBittorrent selector tests passed")
+    print("mock qBittorrent integration tests passed")
     return 0
 
 

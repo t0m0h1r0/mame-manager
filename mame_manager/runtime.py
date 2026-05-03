@@ -156,3 +156,10 @@ class Validator:
                 raise FatalError(f"required executable not found: {exe}")
         if not read_only and not self.cfg.no_qnap and not self.cfg.rsync_pass.exists():
             raise FatalError(f"rsync password file not found: {self.cfg.rsync_pass}")
+        if self.cfg.qbittorrent_enabled:
+            if not self.cfg.qbittorrent_password:
+                raise FatalError("--qbittorrent-password or QBITTORRENT_PASSWORD is required when qBittorrent is enabled")
+            if self.cfg.qbittorrent_priority < 0 or self.cfg.qbittorrent_skip_priority < 0:
+                raise FatalError("qBittorrent priorities must be >= 0")
+            if self.cfg.qbittorrent_timeout < 1:
+                raise FatalError("--qbittorrent-timeout must be >= 1")

@@ -27,6 +27,20 @@ class RunConfig:
     yes: bool
     force_large_sync: bool
     large_sync_threshold: int
+    qbittorrent_url: str | None
+    qbittorrent_user: str
+    qbittorrent_password: str | None
+    qbittorrent_hash: str | None
+    qbittorrent_name: str | None
+    qbittorrent_priority: int
+    qbittorrent_skip_priority: int
+    qbittorrent_resume: bool
+    qbittorrent_dry_run: bool
+    qbittorrent_timeout: int
+
+    @property
+    def qbittorrent_enabled(self) -> bool:
+        return bool(self.qbittorrent_url)
 
     @property
     def clean(self) -> Path:
@@ -67,4 +81,3 @@ class RunConfig:
     @property
     def target_manifest_file(self) -> Path:
         return self.work / "target_manifest.json"
-

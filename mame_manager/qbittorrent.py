@@ -82,15 +82,6 @@ class QBittorrentClient:
             raise QBittorrentError(f"qBittorrent API request failed: {path}: {exc}") from exc
 
 
-def read_wanted_files(path: Path) -> set[str]:
-    wanted = set()
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        item = line.strip()
-        if item and not item.startswith("#"):
-            wanted.add(normalize_torrent_path(item))
-    return wanted
-
-
 def normalize_torrent_path(path: str) -> str:
     return path.strip().replace("\\", "/").lstrip("./")
 
@@ -120,61 +111,3 @@ def select_file_ids(files: list[dict[str, Any]], wanted: set[str]) -> tuple[list
 
 def torrent_display_name(torrent: dict[str, Any]) -> str:
     return str(torrent.get("name") or torrent.get("hash") or "<unnamed>")
-
-
-def choose_torrent(
-    client: QBittorrentClient,
-    wanted: set[str],
-    torrent_hash: str | None = None,
-    torrent_name_filter: str | None = None,
-) -> tuple[str, list[dict[str, Any]], list[int], list[str]]:
-    if torrent_hash:
-        files = client.torrent_files(torrent_hash)
-        selected, unmatched = select_file_ids(files, wanted)
-        return torrent_hash, files, selected, unmatched
-
-    torrents = client.torrents()
-    if torrent_name_filter:
-        needle = torrent_name_filter.lower()
-        torrents = [t for t in torrents if needle in torrent_display_name(t).lower()]
-    if not torrents:
-        raise QBittorrentError("no qBittorrent torrents matched the selection criteria")
-
-    scored = []
-    errors = []
-    for torrent in torrents:
-        h = torrent.get("hash")
-        if not h:
-            continue
-        try:
-            files = client.torrent_files(str(h))
-        except QBittorrentError as exc:
-            errors.append(f"{torrent_display_name(torrent)}: {exc}")
-            continue
-        selected, unmatched = select_file_ids(files, wanted)
-        scored.append(
-            {
-                "hash": str(h),
-                "name": torrent_display_name(torrent),
-                "files": files,
-                "selected": selected,
-                "unmatched": unmatched,
-                "score": len(selected),
-            }
-        )
-
-    if not scored:
-        detail = "; ".join(errors) if errors else "no torrents with file metadata"
-        raise QBittorrentError(f"could not inspect any torrent files: {detail}")
-
-    scored.sort(key=lambda x: (-x["score"], x["name"]))
-    best = scored[0]
-    if best["score"] == 0:
-        raise QBittorrentError("no torrent contains any wanted files")
-    ties = [x for x in scored if x["score"] == best["score"]]
-    if len(ties) > 1:
-        names = ", ".join(f"{x['name']} ({x['hash']})" for x in ties[:10])
-        raise QBittorrentError(
-            f"multiple torrents have the same best match score {best['score']}; use --hash or --torrent-name. Candidates: {names}"
-        )
-    return best["hash"], best["files"], best["selected"], best["unmatched"]

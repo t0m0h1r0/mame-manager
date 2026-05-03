@@ -32,6 +32,17 @@ def parse_args(argv: list[str]) -> RunConfig:
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--force-large-sync", action="store_true")
     parser.add_argument("--large-sync-threshold", type=int, default=1000)
+    qb = parser.add_argument_group("qBittorrent")
+    qb.add_argument("--qbittorrent-url", "--qb-url", dest="qbittorrent_url", default=os.environ.get("QBITTORRENT_URL"))
+    qb.add_argument("--qbittorrent-user", "--qb-user", dest="qbittorrent_user", default=os.environ.get("QBITTORRENT_USER", "admin"))
+    qb.add_argument("--qbittorrent-password", "--qb-password", dest="qbittorrent_password", default=os.environ.get("QBITTORRENT_PASSWORD"))
+    qb.add_argument("--qbittorrent-hash", "--qb-hash", dest="qbittorrent_hash", default=None)
+    qb.add_argument("--qbittorrent-name", "--qb-name", dest="qbittorrent_name", default=None)
+    qb.add_argument("--qbittorrent-priority", "--qb-priority", dest="qbittorrent_priority", type=int, default=1)
+    qb.add_argument("--qbittorrent-skip-priority", "--qb-skip-priority", dest="qbittorrent_skip_priority", type=int, default=0)
+    qb.add_argument("--qbittorrent-resume", "--qb-resume", dest="qbittorrent_resume", action="store_true")
+    qb.add_argument("--qbittorrent-dry-run", "--qb-dry-run", dest="qbittorrent_dry_run", action="store_true")
+    qb.add_argument("--qbittorrent-timeout", "--qb-timeout", dest="qbittorrent_timeout", type=int, default=30)
 
     # Backward-compatible no-op options from the Igir-based prototype.
     parser.add_argument("--igir-bin", default=None, help=argparse.SUPPRESS)
@@ -66,6 +77,16 @@ def parse_args(argv: list[str]) -> RunConfig:
         yes=args.yes,
         force_large_sync=args.force_large_sync,
         large_sync_threshold=args.large_sync_threshold,
+        qbittorrent_url=args.qbittorrent_url,
+        qbittorrent_user=args.qbittorrent_user,
+        qbittorrent_password=args.qbittorrent_password,
+        qbittorrent_hash=args.qbittorrent_hash,
+        qbittorrent_name=args.qbittorrent_name,
+        qbittorrent_priority=args.qbittorrent_priority,
+        qbittorrent_skip_priority=args.qbittorrent_skip_priority,
+        qbittorrent_resume=args.qbittorrent_resume,
+        qbittorrent_dry_run=args.qbittorrent_dry_run,
+        qbittorrent_timeout=args.qbittorrent_timeout,
     )
 
 

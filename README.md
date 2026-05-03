@@ -12,33 +12,37 @@ The script reads MAME XML and software-list XML, indexes ZIP/7z archives with
 ./mame_manager.py --scan-only --skip-xml --scan-jobs 8
 ./mame_manager.py --rebuild-plan-only --skip-xml --scan-jobs 8
 ./mame_manager.py --scan-only --skip-xml --torrent-plan torrent_file_list.txt
+./mame_manager.py --scan-only --skip-xml --qbittorrent-url http://localhost:8080 --qbittorrent-password 'password' --qbittorrent-name 'MAME 0.287 ROMs' --qbittorrent-dry-run
 ./mame_manager.py --skip-xml --merge-mode merged --no-qnap
 ```
 
 Current implementation supports `--merge-mode merged`.
 
-## qBittorrent File Selection
+## qBittorrent Download Selection
 
-`mame_manager.py --torrent-plan` creates a wanted file list.  Apply it to an
-already-added qBittorrent torrent with:
+`mame_manager.py` can directly instruct an already-added qBittorrent torrent to
+download only missing or broken archives.  It inspects the torrents exposed by
+the WebUI, chooses the torrent with the most matching missing targets, sets all
+torrent files to priority `0`, then sets only wanted files to priority `1`.
 
 ```bash
-./qb_select_wanted.py \
-  --url http://localhost:8080 \
-  --user admin \
-  --password 'password' \
-  --wanted work_mame/reports/torrent_wanted_files.txt \
-  --torrent-name 'MAME 0.287 ROMs' \
-  --dry-run
+./mame_manager.py \
+  --scan-only \
+  --skip-xml \
+  --qbittorrent-url http://localhost:8080 \
+  --qbittorrent-user admin \
+  --qbittorrent-password 'password' \
+  --qbittorrent-name 'MAME 0.287 ROMs' \
+  --qbittorrent-dry-run
 ```
 
-When `--hash` is omitted, the tool inspects qBittorrent torrents and picks the
-one with the most wanted-file matches.  Use `--torrent-name` to narrow the
-auto-detection.  When the dry run looks right, omit `--dry-run`.  Add `--resume`
-to start the torrent after priorities are applied.  The tool first sets all
-torrent files to priority `0`, then sets wanted files to priority `1`.
+When the dry run looks right, omit `--qbittorrent-dry-run`.  Add
+`--qbittorrent-resume` to start the torrent after priorities are applied.  Use
+`--qbittorrent-name` to narrow auto-detection, or `--qbittorrent-hash` when you
+want to force a specific torrent.  `QBITTORRENT_URL`, `QBITTORRENT_USER`, and
+`QBITTORRENT_PASSWORD` environment variables are also accepted.
 
-This helper only controls an existing qBittorrent torrent.  It does not fetch
+This integration only controls an existing qBittorrent torrent.  It does not fetch
 metadata from magnet links and does not download files by itself.
 
 ## Architecture
@@ -56,8 +60,7 @@ script happened to run:
 CLI files stay thin.  Business logic lives in the package.
 
 ```text
-mame_manager.py                  main audit/rebuild CLI wrapper
-qb_select_wanted.py              compatibility CLI wrapper for qBittorrent
+mame_manager.py                  main audit/rebuild/qBittorrent CLI wrapper
 
 mame_manager/
   cli.py                         argument parsing for mame_manager.py
@@ -70,15 +73,15 @@ mame_manager/
   builder.py                     clean_images archive reuse and rebuild
   publisher.py                   guarded rsync publication
   torrents.py                    wanted-file plan from missing/broken targets
-  qbittorrent.py                 qBittorrent Web API adapter and matching
-  qbittorrent_cli.py             qBittorrent selector CLI implementation
+  qbittorrent.py                 qBittorrent Web API adapter and file matching
   reports.py                     report and summary writing
   runtime.py                     subprocess, hashing, JSON, and preflight tools
 ```
 
 ## Safety
 
-- `--scan-only` is read-only.
+- `--scan-only` is read-only unless qBittorrent write options are supplied.
+- `--qbittorrent-dry-run` inspects WebUI matches without changing torrent priorities.
 - Normal rebuilds write to `work_mame/clean_images/` first.
 - `images/` updates go through `rsync --dry-run --itemize-changes`.
 - Large rsync changes are stopped unless `--force-large-sync` is used.
@@ -104,3 +107,6 @@ Important files include:
 - `torrent_wanted_files.txt`
 - `torrent_unmatched_targets.txt`
 - `torrent_target_map.tsv`
+- `torrent_broken_archive_wanted_files.txt`
+- `qbittorrent_selected_files.txt`
+- `qbittorrent_unmatched_wanted_files.txt`

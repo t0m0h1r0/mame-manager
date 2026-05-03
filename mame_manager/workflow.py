@@ -16,7 +16,7 @@ from .builder import Rebuilder
 from .reports import ReportManager
 from .runtime import Shell
 from .publisher import SyncManager
-from .torrents import TorrentPlanner
+from .torrents import QBittorrentDownloadManager, TorrentPlanner
 from .runtime import Validator
 
 class MameRebuildApp:
@@ -60,6 +60,9 @@ class MameRebuildApp:
             if self.cfg.torrent_plan:
                 self.report.phase("plan torrent files")
                 TorrentPlanner(self.cfg, self.report).plan(missing_roms, inventory.bad_archives)
+            if self.cfg.qbittorrent_enabled:
+                self.report.phase("apply qBittorrent file priorities")
+                QBittorrentDownloadManager(self.cfg, self.report).apply(missing_roms, inventory.bad_archives)
             self.report.phase("scan CHDs")
             chds = ChdCache(self.cfg, self.shell, self.report).scan()
             assets = AssetManager(self.cfg, self.report)
