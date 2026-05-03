@@ -170,7 +170,7 @@ class Validator:
         if not self.cfg.images.exists():
             raise FatalError(f"images directory not found: {self.cfg.images}")
         self.cfg.new.mkdir(parents=True, exist_ok=True)
-        if not self.cfg.skip_xml and not self.cfg.mame_bin.exists():
+        if self.cfg.update_xml and not self.cfg.mame_bin.exists():
             raise FatalError(f"MAME binary not found: {self.cfg.mame_bin}")
         read_only = self.cfg.scan_only or self.cfg.rebuild_plan_only or bool(self.cfg.torrent_plan)
         for exe, needed in ((self.cfg.sevenz_bin, True), (self.cfg.rsync_bin, not read_only)):

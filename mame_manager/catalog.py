@@ -16,10 +16,10 @@ class DatExtractor:
 
     def extract(self) -> None:
         self.cfg.work.mkdir(parents=True, exist_ok=True)
-        if self.cfg.skip_xml:
+        if not self.cfg.update_xml:
             missing = [p for p in (self.cfg.arcade_xml, self.cfg.software_xml) if not p.exists()]
             if missing:
-                raise FatalError("--skip-xml used but XML file is missing: " + ", ".join(map(str, missing)))
+                raise FatalError("XML file is missing; run with --update-xml to generate it: " + ", ".join(map(str, missing)))
             return
         if not self.cfg.mame_bin.exists():
             raise FatalError(f"MAME binary not found: {self.cfg.mame_bin}")

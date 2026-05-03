@@ -18,7 +18,7 @@ class RunConfig:
     scan_only: bool
     rebuild_plan_only: bool
     torrent_plan: Path | None
-    skip_xml: bool
+    update_xml: bool
     no_qnap: bool
     rebuild_mode: str
     sevenz_bin: str

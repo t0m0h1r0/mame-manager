@@ -14,7 +14,14 @@ def parse_args(argv: list[str]) -> RunConfig:
     parser.add_argument("--rebuild", action="store_true", help="rebuild clean_images and sync it to images after scanning")
     parser.add_argument("--rebuild-plan-only", action="store_true")
     parser.add_argument("--torrent-plan", type=Path, default=defaults.DEFAULT_TORRENT_PLAN, metavar="FILE_LIST")
-    parser.add_argument("--skip-xml", action="store_true")
+    parser.add_argument(
+        "--update-xml",
+        "--generate-xml",
+        dest="update_xml",
+        action="store_true",
+        help="generate/update MAME XML before scanning",
+    )
+    parser.add_argument("--skip-xml", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--no-qnap", action="store_true")
     parser.add_argument("--mame-bin", type=Path, default=defaults.DEFAULT_MAME_BIN)
     parser.add_argument("--images", type=Path, default=defaults.DEFAULT_IMAGES_DIR)
@@ -106,6 +113,8 @@ def parse_args(argv: list[str]) -> RunConfig:
         parser.error("--scan-only and --rebuild cannot be used together")
     if args.rebuild and args.rebuild_plan_only:
         parser.error("--rebuild and --rebuild-plan-only cannot be used together")
+    if args.skip_xml and args.update_xml:
+        parser.error("--skip-xml and --update-xml cannot be used together")
     if args.backup_qnap and not args.rebuild:
         parser.error("--backup-qnap requires --rebuild")
     if args.backup_qnap and args.no_qnap:
@@ -131,7 +140,7 @@ def parse_args(argv: list[str]) -> RunConfig:
         scan_only=not (args.rebuild or args.rebuild_plan_only),
         rebuild_plan_only=args.rebuild_plan_only,
         torrent_plan=args.torrent_plan,
-        skip_xml=args.skip_xml,
+        update_xml=args.update_xml,
         no_qnap=args.no_qnap,
         rebuild_mode=args.rebuild_mode,
         sevenz_bin=args.sevenz_bin,

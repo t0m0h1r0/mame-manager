@@ -2,8 +2,8 @@
 
 Python-only helper for auditing and rebuilding a MAME `images/` tree.
 
-The script reads MAME XML and software-list XML, indexes ZIP/7z archives with
-`7z`, checks CHDs with `chdman` when available, and builds a safe
+The script reads cached MAME XML and software-list XML, indexes ZIP/7z archives
+with `7z`, checks CHDs with `chdman` when available, and builds a safe
 `work_mame/clean_images/` tree before any rsync update.
 
 By default, newly downloaded material is read from `Downloads/`.  Visible files
@@ -13,19 +13,21 @@ hidden files and files under hidden directories are ignored.
 ## Basic Usage
 
 ```bash
-./mame_manager.py --skip-xml --scan-jobs 8
-./mame_manager.py --scan-only --skip-xml --scan-jobs 8
-./mame_manager.py --rebuild-plan-only --skip-xml --scan-jobs 8
-./mame_manager.py --scan-only --skip-xml --torrent-plan torrent_file_list.txt
-QBITTORRENT_PASSWORD='password' ./mame_manager.py --scan-only --skip-xml --download-missing --qbittorrent-dry-run
-./mame_manager.py --rebuild --skip-xml --merge-mode merged
-./mame_manager.py --rebuild --skip-xml --merge-mode merged --backup-qnap
+./mame_manager.py --scan-jobs 8
+./mame_manager.py --scan-only --scan-jobs 8
+./mame_manager.py --update-xml --scan-only --scan-jobs 8
+./mame_manager.py --rebuild-plan-only --scan-jobs 8
+./mame_manager.py --scan-only --torrent-plan torrent_file_list.txt
+QBITTORRENT_PASSWORD='password' ./mame_manager.py --scan-only --download-missing --qbittorrent-dry-run
+./mame_manager.py --rebuild --merge-mode merged
+./mame_manager.py --rebuild --merge-mode merged --backup-qnap
 ```
 
 Current implementation supports `--merge-mode merged`.
-The default action is scan-only.  Use `--rebuild` to build `clean_images/` and
-sync it back to `images/`.  Add `--backup-qnap` to also rsync `images/` to the
-backup URL.
+The default action is scan-only, and XML generation is not performed unless
+`--update-xml` is supplied.  Use `--rebuild` to build `clean_images/` and sync
+it back to `images/`.  Add `--backup-qnap` to also rsync `images/` to the backup
+URL.
 
 ## Standard Workflow
 
@@ -38,12 +40,13 @@ scan -> detect missing files -> register qBittorrent downloads -> download
 
 In practice:
 
-1. Run a dry run with `--download-missing --qbittorrent-dry-run`.
-2. If the selected files look right, run again without `--qbittorrent-dry-run`
+1. When the MAME version changes, refresh XML with `--update-xml`.
+2. Run a dry run with `--download-missing --qbittorrent-dry-run`.
+3. If the selected files look right, run again without `--qbittorrent-dry-run`
    and optionally with `--qbittorrent-resume`.
-3. After qBittorrent finishes downloading into `Downloads/`, run with
+4. After qBittorrent finishes downloading into `Downloads/`, run with
    `--rebuild`.
-4. Add `--backup-qnap` only when you want the rsync backup too.
+5. Add `--backup-qnap` only when you want the rsync backup too.
 
 ## qBittorrent Download Selection
 
@@ -58,7 +61,6 @@ This only happens when `--download-missing` is present.
 QBITTORRENT_PASSWORD='password' \
 ./mame_manager.py \
   --scan-only \
-  --skip-xml \
   --download-missing \
   --qbittorrent-dry-run
 ```
@@ -111,6 +113,7 @@ mame_manager/
 ## Safety
 
 - scan-only is the default and is read-only unless `--download-missing` is supplied.
+- `--update-xml` is required before generating or refreshing MAME XML.
 - `--rebuild` is required before rebuilding `clean_images/` or syncing to `images/`.
 - `--backup-qnap` is required before rsyncing `images/` to the backup URL.
 - `--qbittorrent-dry-run` inspects WebUI matches without changing torrent priorities.
