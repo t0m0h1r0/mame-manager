@@ -7,7 +7,16 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from .runtime import ARCHIVE_EXTS, SAMPLE_EXTS, VERSION, atomic_write_json, load_json, now_iso, sha256_bytes
+from .runtime import (
+    ARCHIVE_EXTS,
+    SAMPLE_EXTS,
+    VERSION,
+    atomic_write_json,
+    iter_visible_files,
+    load_json,
+    now_iso,
+    sha256_bytes,
+)
 from .settings import RunConfig
 from .reports import ReportManager
 from .runtime import Shell
@@ -29,9 +38,7 @@ class Fingerprinter:
             (self.cfg.new, "new_sample", SAMPLE_EXTS),
         ]
         for root, kind, exts in roots:
-            if not root.exists():
-                continue
-            for path in root.rglob("*"):
+            for path in iter_visible_files(root):
                 if path.is_file() and path.suffix.lower() in exts:
                     st = path.stat()
                     rows.append({"path": str(path.resolve()), "size": st.st_size, "mtime_ns": st.st_mtime_ns, "kind": kind})
@@ -59,9 +66,7 @@ class ArchiveIndexer:
     def archive_paths(self) -> list[Path]:
         paths = []
         for root in (self.cfg.images / "roms", self.cfg.images / "software_roms", self.cfg.new):
-            if not root.exists():
-                continue
-            paths.extend(p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in ARCHIVE_EXTS)
+            paths.extend(p for p in iter_visible_files(root) if p.suffix.lower() in ARCHIVE_EXTS)
         return sorted(paths)
 
     def index_all(self) -> dict[str, dict[str, Any]]:

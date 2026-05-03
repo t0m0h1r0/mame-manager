@@ -10,6 +10,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib import parse
 
+from mame_manager.defaults import DEFAULT_NEW_DIR
+from mame_manager.runtime import iter_visible_files
+
 
 REQUESTS: list[tuple[str, dict[str, list[str]]]] = []
 TORRENTS = [
@@ -136,6 +139,17 @@ def run_manager(root: Path, url: str, *extra: str, enable_download: bool = True)
 
 
 def main() -> int:
+    assert DEFAULT_NEW_DIR == Path("Downloads")
+    with tempfile.TemporaryDirectory() as td:
+        incoming = Path(td) / "Downloads"
+        incoming.mkdir()
+        (incoming / "visible.zip").write_text("", encoding="utf-8")
+        (incoming / ".hidden.zip").write_text("", encoding="utf-8")
+        hidden_dir = incoming / ".partial"
+        hidden_dir.mkdir()
+        (hidden_dir / "nested.zip").write_text("", encoding="utf-8")
+        assert [path.name for path in iter_visible_files(incoming)] == ["visible.zip"]
+
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

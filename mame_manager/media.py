@@ -6,7 +6,7 @@ import re
 import shutil
 from pathlib import Path
 
-from .runtime import SAMPLE_EXTS, VERSION, atomic_write_json, load_json, now_iso, sha1_file
+from .runtime import SAMPLE_EXTS, VERSION, atomic_write_json, iter_visible_files, load_json, now_iso, sha1_file
 from .settings import RunConfig
 from .catalog import DatIndex
 from .reports import ReportManager
@@ -40,8 +40,7 @@ class ChdCache:
     def scan(self) -> dict[str, Path]:
         paths = []
         for root in (self.cfg.images / "chds", self.cfg.images / "software_chds", self.cfg.new):
-            if root.exists():
-                paths.extend(p for p in root.rglob("*.chd") if p.is_file())
+            paths.extend(p for p in iter_visible_files(root) if p.suffix.lower() == ".chd")
         by_sha1: dict[str, Path] = {}
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.cfg.scan_jobs) as ex:
             for path, sha1 in ex.map(self._sha1_for, paths):
@@ -114,9 +113,7 @@ class AssetManager:
     def sample_sources(self) -> dict[str, Path]:
         found: dict[str, Path] = {}
         for root in (self.cfg.images / "samples", self.cfg.new):
-            if not root.exists():
-                continue
-            for path in root.rglob("*"):
+            for path in iter_visible_files(root):
                 if path.is_file() and path.suffix.lower() in SAMPLE_EXTS:
                     found[path.stem] = path
         return found

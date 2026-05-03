@@ -6,6 +6,10 @@ The script reads MAME XML and software-list XML, indexes ZIP/7z archives with
 `7z`, checks CHDs with `chdman` when available, and builds a safe
 `work_mame/clean_images/` tree before any rsync update.
 
+By default, newly downloaded material is read from `Downloads/`.  Visible files
+under that tree are treated as an incoming pool regardless of directory layout;
+hidden files and files under hidden directories are ignored.
+
 ## Basic Usage
 
 ```bash
@@ -17,6 +21,23 @@ QBITTORRENT_PASSWORD='password' ./mame_manager.py --scan-only --skip-xml --downl
 ```
 
 Current implementation supports `--merge-mode merged`.
+
+## Standard Workflow
+
+The intended operating loop is:
+
+```text
+scan -> detect missing files -> register qBittorrent downloads -> download
+-> rescan -> rebuild clean_images -> rescan/verify -> rsync images and backup
+```
+
+In practice:
+
+1. Run a dry run with `--download-missing --qbittorrent-dry-run`.
+2. If the selected files look right, run again without `--qbittorrent-dry-run`
+   and optionally with `--qbittorrent-resume`.
+3. After qBittorrent finishes downloading into `Downloads/`, run a normal
+   rebuild without `--scan-only`.
 
 ## qBittorrent Download Selection
 

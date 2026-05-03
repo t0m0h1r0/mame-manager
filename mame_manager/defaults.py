@@ -5,7 +5,7 @@ from pathlib import Path
 
 DEFAULT_MAME_BIN = Path("mame/mame")
 DEFAULT_IMAGES_DIR = Path("images")
-DEFAULT_NEW_DIR = Path("new")
+DEFAULT_NEW_DIR = Path("Downloads")
 DEFAULT_WORK_DIR = Path("work_mame")
 DEFAULT_RSYNC_PASSWORD_FILE = Path(".rsync")
 DEFAULT_BACKUP_URL = "rsync://rsync@qnap2/Game/Multi-Platform/images/"

@@ -78,6 +78,28 @@ def safe_rmtree(path: Path, work: Path) -> None:
         shutil.rmtree(path)
 
 
+def is_hidden_path(path: Path, root: Path) -> bool:
+    try:
+        rel = path.relative_to(root)
+    except ValueError:
+        rel = path
+    return any(part.startswith(".") for part in rel.parts)
+
+
+def iter_visible_files(root: Path) -> Iterable[Path]:
+    if not root.exists():
+        return
+    for current, dirnames, filenames in os.walk(root):
+        dirnames[:] = [name for name in dirnames if not name.startswith(".")]
+        current_path = Path(current)
+        for filename in filenames:
+            if filename.startswith("."):
+                continue
+            path = current_path / filename
+            if path.is_file() and not is_hidden_path(path, root):
+                yield path
+
+
 class Shell:
     def capture(
         self,
