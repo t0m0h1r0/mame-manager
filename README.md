@@ -27,14 +27,16 @@ already-added qBittorrent torrent with:
   --url http://localhost:8080 \
   --user admin \
   --password 'password' \
-  --hash TORRENT_HASH \
   --wanted work_mame/reports/torrent_wanted_files.txt \
+  --torrent-name 'MAME 0.287 ROMs' \
   --dry-run
 ```
 
-When the dry run looks right, omit `--dry-run`.  Add `--resume` to start the
-torrent after priorities are applied.  The tool first sets all torrent files to
-priority `0`, then sets wanted files to priority `1`.
+When `--hash` is omitted, the tool inspects qBittorrent torrents and picks the
+one with the most wanted-file matches.  Use `--torrent-name` to narrow the
+auto-detection.  When the dry run looks right, omit `--dry-run`.  Add `--resume`
+to start the torrent after priorities are applied.  The tool first sets all
+torrent files to priority `0`, then sets wanted files to priority `1`.
 
 This helper only controls an existing qBittorrent torrent.  It does not fetch
 metadata from magnet links and does not download files by itself.

@@ -11,6 +11,10 @@ from urllib import parse
 
 
 REQUESTS: list[tuple[str, dict[str, list[str]]]] = []
+TORRENTS = [
+    {"hash": "bad111", "name": "Other torrent"},
+    {"hash": "abc123", "name": "MAME 0.287 ROMs (merged)"},
+]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -34,11 +38,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         REQUESTS.append((self.path, {}))
         if self.path.startswith("/api/v2/torrents/files"):
-            payload = [
-                {"name": "MAME 0.287 ROMs (merged)/100in1rg.zip"},
-                {"name": "MAME 0.287 ROMs (merged)/bloodstm.zip"},
-                {"name": "MAME 0.287 ROMs (merged)/other.zip"},
-            ]
+            qs = parse.parse_qs(parse.urlsplit(self.path).query)
+            torrent_hash = qs.get("hash", [""])[0]
+            if torrent_hash == "abc123":
+                payload = [
+                    {"name": "MAME 0.287 ROMs (merged)/100in1rg.zip"},
+                    {"name": "MAME 0.287 ROMs (merged)/bloodstm.zip"},
+                    {"name": "MAME 0.287 ROMs (merged)/other.zip"},
+                ]
+            else:
+                payload = [{"name": "other.zip"}]
             data = json.dumps(payload).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -47,7 +56,7 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(data)
             return
         if self.path == "/api/v2/torrents/info":
-            data = b"[]"
+            data = json.dumps(TORRENTS).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(data)))
@@ -132,6 +141,31 @@ def main() -> int:
         assert file_prio[1][1]["id"] == ["0|1"]
         assert file_prio[1][1]["priority"] == ["1"]
         assert any(path == "/api/v2/torrents/resume" for path, _ in REQUESTS)
+
+        REQUESTS.clear()
+        auto = subprocess.run(
+            [
+                sys.executable,
+                "qb_select_wanted.py",
+                "--url",
+                url,
+                "--user",
+                "admin",
+                "--password",
+                "secret",
+                "--wanted",
+                str(wanted),
+                "--torrent-name",
+                "MAME",
+                "--dry-run",
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+        assert "torrent hash: abc123" in auto.stdout
+        assert "selected files: 2" in auto.stdout
     server.shutdown()
     print("mock qBittorrent selector tests passed")
     return 0
