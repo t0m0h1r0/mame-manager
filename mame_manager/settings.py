@@ -27,6 +27,7 @@ class RunConfig:
     yes: bool
     force_large_sync: bool
     large_sync_threshold: int
+    download_missing: bool
     qbittorrent_url: str | None
     qbittorrent_user: str
     qbittorrent_password: str | None
@@ -40,7 +41,7 @@ class RunConfig:
 
     @property
     def qbittorrent_enabled(self) -> bool:
-        return bool(self.qbittorrent_url)
+        return self.download_missing
 
     @property
     def clean(self) -> Path:

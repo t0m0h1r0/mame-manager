@@ -101,10 +101,11 @@ def write_fixture(root: Path) -> tuple[Path, Path, Path, Path]:
     return images, new, work, sevenz
 
 
-def run_manager(root: Path, url: str, *extra: str) -> subprocess.CompletedProcess[str]:
+def run_manager(root: Path, url: str, *extra: str, enable_download: bool = True) -> subprocess.CompletedProcess[str]:
     images, new, work, sevenz = write_fixture(root)
     env = os.environ.copy()
     env["QBITTORRENT_PASSWORD"] = "secret"
+    action = ["--download-missing"] if enable_download else []
     return subprocess.run(
         [
             sys.executable,
@@ -123,6 +124,7 @@ def run_manager(root: Path, url: str, *extra: str) -> subprocess.CompletedProces
             url,
             "--qbittorrent-user",
             "admin",
+            *action,
             *extra,
         ],
         text=True,
@@ -140,6 +142,10 @@ def main() -> int:
     url = f"http://127.0.0.1:{server.server_port}"
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
+        passive = run_manager(root / "passive", url, enable_download=False)
+        assert "qBittorrent selected files" not in passive.stdout
+        assert not REQUESTS
+
         dry = run_manager(root / "dry", url, "--qbittorrent-hash", "abc123", "--qbittorrent-dry-run")
         assert "qBittorrent selected files: 2/3" in dry.stdout
         assert "qBittorrent unmatched wanted files: 0" in dry.stdout

@@ -32,8 +32,18 @@ def parse_args(argv: list[str]) -> RunConfig:
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--force-large-sync", action="store_true")
     parser.add_argument("--large-sync-threshold", type=int, default=1000)
+    parser.add_argument(
+        "--download-missing",
+        action="store_true",
+        help="apply missing/broken archive selection to qBittorrent after the scan",
+    )
     qb = parser.add_argument_group("qBittorrent")
-    qb.add_argument("--qbittorrent-url", "--qb-url", dest="qbittorrent_url", default=os.environ.get("QBITTORRENT_URL"))
+    qb.add_argument(
+        "--qbittorrent-url",
+        "--qb-url",
+        dest="qbittorrent_url",
+        default=os.environ.get("QBITTORRENT_URL", "http://localhost:8080"),
+    )
     qb.add_argument("--qbittorrent-user", "--qb-user", dest="qbittorrent_user", default=os.environ.get("QBITTORRENT_USER", "admin"))
     qb.add_argument("--qbittorrent-password", "--qb-password", dest="qbittorrent_password", default=os.environ.get("QBITTORRENT_PASSWORD"))
     qb.add_argument("--qbittorrent-hash", "--qb-hash", dest="qbittorrent_hash", default=None)
@@ -54,6 +64,13 @@ def parse_args(argv: list[str]) -> RunConfig:
     parser.add_argument("--rom-scan-mode", default=None, help=argparse.SUPPRESS)
 
     args = parser.parse_args(argv)
+    if not args.download_missing and (
+        args.qbittorrent_dry_run
+        or args.qbittorrent_resume
+        or args.qbittorrent_hash
+        or args.qbittorrent_name
+    ):
+        parser.error("qBittorrent selection options require --download-missing")
     return RunConfig(
         mame_bin=args.mame_bin,
         images=args.images,
@@ -77,6 +94,7 @@ def parse_args(argv: list[str]) -> RunConfig:
         yes=args.yes,
         force_large_sync=args.force_large_sync,
         large_sync_threshold=args.large_sync_threshold,
+        download_missing=args.download_missing,
         qbittorrent_url=args.qbittorrent_url,
         qbittorrent_user=args.qbittorrent_user,
         qbittorrent_password=args.qbittorrent_password,
