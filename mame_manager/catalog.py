@@ -80,9 +80,13 @@ class DatIndex:
             if not machine:
                 elem.clear()
                 continue
+            parent = elem.attrib.get("cloneof") or machine
+            is_clone = parent != machine
             entries = []
             for rom in elem.findall("rom"):
                 if rom.attrib.get("status") == "nodump":
+                    continue
+                if self.merge_mode == "merged" and is_clone and rom.attrib.get("merge"):
                     continue
                 name = rom.attrib.get("name")
                 size = rom.attrib.get("size")
@@ -90,7 +94,13 @@ class DatIndex:
                 if name and size and crc:
                     entries.append({"name": name, "size": parse_int(size), "crc": crc.upper(), "sha1": rom.attrib.get("sha1")})
             if entries:
-                self.arcade_targets[f"roms/{machine}.7z"] = {"kind": "arcade", "machine": machine, "entries": entries}
+                rel = f"roms/{parent}.7z" if self.merge_mode == "merged" else f"roms/{machine}.7z"
+                target = self.arcade_targets.setdefault(
+                    rel,
+                    {"kind": "arcade", "machine": parent, "machines": [], "entries": []},
+                )
+                target["machines"].append(machine)
+                self._add_unique_entries(target["entries"], entries)
             for disk in elem.findall("disk"):
                 if disk.attrib.get("status") == "nodump":
                     continue
@@ -115,9 +125,13 @@ class DatIndex:
                 sw_name = software.attrib.get("name")
                 if not sw_name:
                     continue
+                parent = software.attrib.get("cloneof") or sw_name
+                is_clone = parent != sw_name
                 entries = []
                 for rom in software.findall(".//rom"):
                     if rom.attrib.get("status") == "nodump":
+                        continue
+                    if self.merge_mode == "merged" and is_clone and rom.attrib.get("merge"):
                         continue
                     name = rom.attrib.get("name")
                     size = rom.attrib.get("size")
@@ -125,13 +139,17 @@ class DatIndex:
                     if name and size and crc:
                         entries.append({"name": name, "size": parse_int(size), "crc": crc.upper(), "sha1": rom.attrib.get("sha1")})
                 if entries:
-                    rel = f"software_roms/{list_name}/{sw_name}.7z"
-                    self.software_targets[rel] = {
+                    rel_name = parent if self.merge_mode == "merged" else sw_name
+                    rel = f"software_roms/{list_name}/{rel_name}.7z"
+                    target = self.software_targets.setdefault(rel, {
                         "kind": "software",
                         "softwarelist": list_name,
-                        "software": sw_name,
-                        "entries": entries,
-                    }
+                        "software": rel_name,
+                        "software_items": [],
+                        "entries": [],
+                    })
+                    target["software_items"].append(sw_name)
+                    self._add_unique_entries(target["entries"], entries)
                 for disk in software.findall(".//disk"):
                     if disk.attrib.get("status") == "nodump":
                         continue
@@ -141,6 +159,16 @@ class DatIndex:
                         self.software_chds.append(
                             {"softwarelist": list_name, "software": sw_name, "disk": name, "sha1": sha1.lower()}
                         )
+
+    @staticmethod
+    def _add_unique_entries(dst: list[dict[str, Any]], src: list[dict[str, Any]]) -> None:
+        seen = {(e["name"], int(e["size"]), (e.get("crc") or "").upper()) for e in dst}
+        for entry in src:
+            key = (entry["name"], int(entry["size"]), (entry.get("crc") or "").upper())
+            if key in seen:
+                continue
+            dst.append(entry)
+            seen.add(key)
 
     def manifest(self) -> dict[str, Any]:
         return {
