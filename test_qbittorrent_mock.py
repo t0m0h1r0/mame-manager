@@ -18,6 +18,7 @@ REQUESTS: list[tuple[str, dict[str, list[str]]]] = []
 TORRENTS = [
     {"hash": "bad111", "name": "Other torrent"},
     {"hash": "abc123", "name": "MAME 0.287 ROMs (merged)"},
+    {"hash": "def456", "name": "MAME 0.287 ROMs update pack"},
 ]
 
 
@@ -55,6 +56,11 @@ class Handler(BaseHTTPRequestHandler):
                     {"name": "MAME 0.287 ROMs (merged)/100in1rg.zip"},
                     {"name": "MAME 0.287 ROMs (merged)/bloodstm.zip"},
                     {"name": "MAME 0.287 ROMs (merged)/other.zip"},
+                ]
+            elif torrent_hash == "def456":
+                payload = [
+                    {"name": "MAME 0.287 ROMs update pack/missing.zip"},
+                    {"name": "MAME 0.287 ROMs update pack/other.zip"},
                 ]
             else:
                 payload = [{"name": "other.zip"}]
@@ -180,6 +186,29 @@ def main() -> int:
         auto = run_manager(root / "auto", url, "--qbittorrent-name", "MAME", "--qbittorrent-dry-run")
         assert "qBittorrent torrent: MAME 0.287 ROMs (merged) (abc123)" in auto.stdout
         assert "qBittorrent selected files: 2/3" in auto.stdout
+        assert "qBittorrent torrent: MAME 0.287 ROMs update pack (def456)" in auto.stdout
+        assert "qBittorrent selected files: 1/2" in auto.stdout
+
+        REQUESTS.clear()
+        all_torrents = run_manager(root / "all", url, "--qbittorrent-name", "MAME", "--qbittorrent-resume")
+        assert "qBittorrent selected files: 2/3" in all_torrents.stdout
+        assert "qBittorrent selected files: 1/2" in all_torrents.stdout
+        file_prio = [(path, fields) for path, fields in REQUESTS if path == "/api/v2/torrents/filePrio"]
+        assert len(file_prio) == 4, REQUESTS
+        assert file_prio[0][1]["hash"] == ["abc123"]
+        assert file_prio[0][1]["id"] == ["0|1|2"]
+        assert file_prio[0][1]["priority"] == ["0"]
+        assert file_prio[1][1]["hash"] == ["abc123"]
+        assert file_prio[1][1]["id"] == ["0|1"]
+        assert file_prio[1][1]["priority"] == ["1"]
+        assert file_prio[2][1]["hash"] == ["def456"]
+        assert file_prio[2][1]["id"] == ["0|1"]
+        assert file_prio[2][1]["priority"] == ["0"]
+        assert file_prio[3][1]["hash"] == ["def456"]
+        assert file_prio[3][1]["id"] == ["0"]
+        assert file_prio[3][1]["priority"] == ["1"]
+        resumes = [(path, fields) for path, fields in REQUESTS if path == "/api/v2/torrents/resume"]
+        assert [fields["hashes"] for _, fields in resumes] == [["abc123"], ["def456"]]
     server.shutdown()
     print("mock qBittorrent integration tests passed")
     return 0

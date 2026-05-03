@@ -32,6 +32,18 @@ class TorrentPlan:
         return sorted(set(self.wanted_files) | set(self.broken_archive_wanted_files))
 
 
+@dataclass(frozen=True)
+class QBittorrentTorrentPlan:
+    torrent_hash: str
+    torrent_name: str
+    files: list[dict[str, Any]]
+    plan: TorrentPlan
+
+    @property
+    def score(self) -> int:
+        return len(self.plan.download_files())
+
+
 class TorrentPlanner:
     def __init__(self, cfg: RunConfig, report: ReportManager):
         self.cfg = cfg
@@ -196,50 +208,90 @@ class QBittorrentDownloadManager:
         )
         try:
             client.login()
-            torrent_hash, torrent_name, files, plan = self._choose_torrent(client, missing_roms, archive_errors)
-            wanted = {normalize_torrent_path(path) for path in plan.download_files()}
-            selected_ids, unmatched = select_file_ids(files, wanted)
-            if wanted and not selected_ids:
-                raise FatalError("qBittorrent plan found wanted files but no torrent file IDs matched; refusing to change priorities")
-            selected_names = [normalize_torrent_path(str(files[i].get("name", ""))) for i in selected_ids]
-            self.planner.write_plan(plan)
-            self.report.write("qbittorrent_selected_files.txt", selected_names)
-            self.report.write("qbittorrent_unmatched_wanted_files.txt", unmatched)
+            torrent_plans = self._matching_torrent_plans(client, missing_roms, archive_errors)
+            combined_plan = self._combine_plans([item.plan for item in torrent_plans])
+            self.planner.write_plan(combined_plan)
+
+            selected_report = []
+            unmatched_report = []
+            per_torrent = []
+            total_files = 0
+            total_selected = 0
+            total_unmatched = 0
+
+            for item in torrent_plans:
+                wanted = {normalize_torrent_path(path) for path in item.plan.download_files()}
+                selected_ids, unmatched = select_file_ids(item.files, wanted)
+                if wanted and not selected_ids:
+                    raise FatalError(
+                        f"qBittorrent plan for {item.torrent_name} found wanted files but no file IDs matched; refusing to change priorities"
+                    )
+                selected_names = [normalize_torrent_path(str(item.files[i].get("name", ""))) for i in selected_ids]
+                selected_report.extend(f"{item.torrent_hash}\t{item.torrent_name}\t{name}" for name in selected_names)
+                unmatched_report.extend(f"{item.torrent_hash}\t{item.torrent_name}\t{name}" for name in unmatched)
+                total_files += len(item.files)
+                total_selected += len(selected_ids)
+                total_unmatched += len(unmatched)
+                per_torrent.append(
+                    {
+                        "torrent_hash": item.torrent_hash,
+                        "torrent_name": item.torrent_name,
+                        "torrent_files": len(item.files),
+                        "wanted_files": len(wanted),
+                        "selected_files": len(selected_ids),
+                        "unmatched_wanted_files": len(unmatched),
+                        "resumed": False,
+                    }
+                )
+                print(f"qBittorrent torrent: {item.torrent_name} ({item.torrent_hash})", flush=True)
+                print(f"qBittorrent selected files: {len(selected_ids)}/{len(item.files)}", flush=True)
+                print(f"qBittorrent unmatched wanted files: {len(unmatched)}", flush=True)
+
+                if self.cfg.qbittorrent_dry_run:
+                    continue
+                all_ids = list(range(len(item.files)))
+                client.set_file_priority(item.torrent_hash, all_ids, self.cfg.qbittorrent_skip_priority)
+                client.set_file_priority(item.torrent_hash, selected_ids, self.cfg.qbittorrent_priority)
+                if self.cfg.qbittorrent_resume:
+                    client.resume(item.torrent_hash)
+                    per_torrent[-1]["resumed"] = True
+
+            self.report.write("qbittorrent_selected_files.txt", selected_report)
+            self.report.write("qbittorrent_unmatched_wanted_files.txt", unmatched_report)
             self.report.summary["qbittorrent"] = {
-                "torrent_hash": torrent_hash,
-                "torrent_name": torrent_name,
-                "torrent_files": len(files),
-                "wanted_files": len(wanted),
-                "selected_files": len(selected_ids),
-                "unmatched_wanted_files": len(unmatched),
+                "torrents": len(torrent_plans),
+                "torrent_files": total_files,
+                "wanted_files": len(combined_plan.download_files()),
+                "selected_files": total_selected,
+                "unmatched_wanted_files": total_unmatched,
                 "dry_run": self.cfg.qbittorrent_dry_run,
-                "resumed": False,
+                "resumed": bool(self.cfg.qbittorrent_resume and not self.cfg.qbittorrent_dry_run),
+                "per_torrent": per_torrent,
             }
-            print(f"qBittorrent torrent: {torrent_name} ({torrent_hash})", flush=True)
-            print(f"qBittorrent selected files: {len(selected_ids)}/{len(files)}", flush=True)
-            print(f"qBittorrent unmatched wanted files: {len(unmatched)}", flush=True)
             if self.cfg.qbittorrent_dry_run:
                 self.report.note("qBittorrent dry-run: no file priorities changed")
-                return
-            all_ids = list(range(len(files)))
-            client.set_file_priority(torrent_hash, all_ids, self.cfg.qbittorrent_skip_priority)
-            client.set_file_priority(torrent_hash, selected_ids, self.cfg.qbittorrent_priority)
-            if self.cfg.qbittorrent_resume:
-                client.resume(torrent_hash)
-                self.report.summary["qbittorrent"]["resumed"] = True
         except QBittorrentError as exc:
             raise FatalError(str(exc)) from exc
 
-    def _choose_torrent(
+    def _matching_torrent_plans(
         self,
         client: QBittorrentClient,
         missing_roms: dict[str, list[str]],
         archive_errors: list[str],
-    ) -> tuple[str, str, list[dict[str, Any]], TorrentPlan]:
+    ) -> list[QBittorrentTorrentPlan]:
         if self.cfg.qbittorrent_hash:
             files = client.torrent_files(self.cfg.qbittorrent_hash)
             plan = self._plan_for_files(files, missing_roms, archive_errors)
-            return self.cfg.qbittorrent_hash, self.cfg.qbittorrent_hash, files, plan
+            if not plan.download_files():
+                raise FatalError("specified qBittorrent torrent contains no missing or broken targets")
+            return [
+                QBittorrentTorrentPlan(
+                    torrent_hash=self.cfg.qbittorrent_hash,
+                    torrent_name=self.cfg.qbittorrent_hash,
+                    files=files,
+                    plan=plan,
+                )
+            ]
 
         torrents = client.torrents()
         if self.cfg.qbittorrent_name:
@@ -248,37 +300,27 @@ class QBittorrentDownloadManager:
         if not torrents:
             raise FatalError("no qBittorrent torrents matched the selection criteria")
 
-        scored = []
+        matched = []
         for torrent in torrents:
             torrent_hash = torrent.get("hash")
             if not torrent_hash:
                 continue
             files = client.torrent_files(str(torrent_hash))
             plan = self._plan_for_files(files, missing_roms, archive_errors)
-            score = len(plan.download_files())
-            scored.append(
-                {
-                    "hash": str(torrent_hash),
-                    "name": torrent_display_name(torrent),
-                    "files": files,
-                    "plan": plan,
-                    "score": score,
-                }
+            if not plan.download_files():
+                continue
+            matched.append(
+                QBittorrentTorrentPlan(
+                    torrent_hash=str(torrent_hash),
+                    torrent_name=torrent_display_name(torrent),
+                    files=files,
+                    plan=plan,
+                )
             )
-        if not scored:
-            raise FatalError("could not inspect any qBittorrent torrent files")
-        scored.sort(key=lambda item: (-int(item["score"]), str(item["name"])))
-        best = scored[0]
-        if best["score"] == 0:
-            raise FatalError("no qBittorrent torrent contains missing or broken targets")
-        ties = [item for item in scored if item["score"] == best["score"]]
-        if len(ties) > 1:
-            names = ", ".join(f"{item['name']} ({item['hash']})" for item in ties[:10])
-            raise FatalError(
-                f"multiple qBittorrent torrents have the same best match score {best['score']}; "
-                f"use --qbittorrent-hash or --qbittorrent-name. Candidates: {names}"
-            )
-        return str(best["hash"]), str(best["name"]), best["files"], best["plan"]
+        if not matched:
+            raise FatalError("no qBittorrent torrents contain missing or broken targets")
+        matched.sort(key=lambda item: (-item.score, item.torrent_name, item.torrent_hash))
+        return matched
 
     def _plan_for_files(
         self,
@@ -288,3 +330,38 @@ class QBittorrentDownloadManager:
     ) -> TorrentPlan:
         names = [str(file_info.get("name", "")) for file_info in files]
         return self.planner.plan_from_file_list(names, missing_roms, archive_errors)
+
+    @staticmethod
+    def _combine_plans(plans: list[TorrentPlan]) -> TorrentPlan:
+        target_mapping = ["target\ttorrent_file"]
+        wanted_files = set()
+        broken_archive_wanted_files = set()
+        missing_targets = 0
+        source_file_count = 0
+        unmatched_targets: set[str] | None = None
+        broken_archive_unmatched: set[str] | None = None
+
+        for plan in plans:
+            source_file_count += plan.source_file_count
+            missing_targets = max(missing_targets, plan.missing_targets)
+            wanted_files.update(plan.wanted_files)
+            broken_archive_wanted_files.update(plan.broken_archive_wanted_files)
+            target_mapping.extend(plan.target_mapping[1:])
+            plan_unmatched = set(plan.unmatched_targets)
+            broken_unmatched = set(plan.broken_archive_unmatched)
+            unmatched_targets = plan_unmatched if unmatched_targets is None else unmatched_targets & plan_unmatched
+            broken_archive_unmatched = (
+                broken_unmatched
+                if broken_archive_unmatched is None
+                else broken_archive_unmatched & broken_unmatched
+            )
+
+        return TorrentPlan(
+            source_file_count=source_file_count,
+            missing_targets=missing_targets,
+            wanted_files=sorted(wanted_files),
+            unmatched_targets=sorted(unmatched_targets or set()),
+            target_mapping=target_mapping,
+            broken_archive_wanted_files=sorted(broken_archive_wanted_files),
+            broken_archive_unmatched=sorted(broken_archive_unmatched or set()),
+        )

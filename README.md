@@ -43,8 +43,9 @@ In practice:
 
 `mame_manager.py` can directly instruct an already-added qBittorrent torrent to
 download only missing or broken archives.  It inspects the torrents exposed by
-the WebUI, chooses the torrent with the most matching missing targets, sets all
-torrent files to priority `0`, then sets only wanted files to priority `1`.
+the WebUI, finds every torrent that contains at least one missing or broken
+target, sets all files in those torrents to priority `0`, then sets only wanted
+files to priority `1` in each matching torrent.
 This only happens when `--download-missing` is present.
 
 ```bash
