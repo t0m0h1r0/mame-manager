@@ -79,7 +79,7 @@ class MameRebuildApp:
                 self.report.print_scan_summary()
             else:
                 if inventory.bad_archives:
-                    raise FatalError(f"{len(inventory.bad_archives)} archive(s) failed 7z indexing; refusing rebuild")
+                    self.report.note(f"{len(inventory.bad_archives)} archive(s) failed 7z indexing; ignoring them as rebuild sources")
                 self.report.phase("rebuild clean_images")
                 Rebuilder(self.cfg, self.shell, self.report, indexer).rebuild(index, inventory, manifest_hash, fp["sha256"], dat_hash)
                 assets.place_chds(index, chds)
