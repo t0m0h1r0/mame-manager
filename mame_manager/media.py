@@ -97,14 +97,14 @@ class AssetManager:
         self.report_chds(index, chds)
         for item in index.arcade_chds:
             src = chds.get(item["sha1"])
-            if not src:
+            if not src or not self._is_incoming(src):
                 continue
             dst = self.cfg.clean / "chds" / item["machine"] / f"{item['disk']}.chd"
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
         for item in index.software_chds:
             src = chds.get(item["sha1"])
-            if not src:
+            if not src or not self._is_incoming(src):
                 continue
             dst = self.cfg.clean / "software_chds" / item["softwarelist"] / item["software"] / f"{item['disk']}.chd"
             dst.parent.mkdir(parents=True, exist_ok=True)
@@ -129,8 +129,17 @@ class AssetManager:
         missing = sorted(samples - set(found))
         for name in sorted(samples & set(found)):
             src = found[name]
+            if not self._is_incoming(src):
+                continue
             dst = self.cfg.clean / "samples" / src.name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
         self.report.write("missing_samples.txt", missing)
         self.report.summary["missing_samples"] = len(missing)
+
+    def _is_incoming(self, path: Path) -> bool:
+        try:
+            path.resolve().relative_to(self.cfg.new.resolve())
+        except ValueError:
+            return False
+        return True

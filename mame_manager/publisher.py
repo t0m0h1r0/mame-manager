@@ -15,13 +15,13 @@ class SyncManager:
         self.report = report
 
     def sync_all(self) -> None:
-        self._sync(self.cfg.clean, self.cfg.images, "rsync_clean_to_images_dry_run.txt")
+        self._sync(self.cfg.clean, self.cfg.images, "rsync_clean_to_images_dry_run.txt", delete=False)
         if self.cfg.backup:
             self._sync(self.cfg.images, self.cfg.backup_url, "rsync_images_to_backup_dry_run.txt", password=self.cfg.rsync_pass)
 
-    def _sync(self, src: Path, dst: Path | str, log_name: str, password: Path | None = None) -> None:
+    def _sync(self, src: Path, dst: Path | str, log_name: str, password: Path | None = None, delete: bool = True) -> None:
         dry_log = self.cfg.reports / log_name
-        dry_cmd = self._cmd(src, dst, dry=True, password=password)
+        dry_cmd = self._cmd(src, dst, dry=True, password=password, delete=delete)
         self.shell.run_to_log(dry_cmd, dry_log, check=True)
         changes = self._count_changes(dry_log)
         self.report.summary[log_name.replace(".txt", "_changes")] = changes
@@ -31,10 +31,12 @@ class SyncManager:
             answer = input(f"Apply rsync with {changes} changes to {dst}? [y/N] ")
             if answer.strip().lower() not in {"y", "yes"}:
                 raise FatalError("user declined rsync")
-        self.shell.run(self._cmd(src, dst, dry=False, password=password), check=True)
+        self.shell.run(self._cmd(src, dst, dry=False, password=password, delete=delete), check=True)
 
-    def _cmd(self, src: Path, dst: Path | str, dry: bool, password: Path | None) -> list[str | Path]:
-        cmd: list[str | Path] = [self.cfg.rsync_bin, "-av", "--delete", "--itemize-changes", "--info=progress2"]
+    def _cmd(self, src: Path, dst: Path | str, dry: bool, password: Path | None, delete: bool) -> list[str | Path]:
+        cmd: list[str | Path] = [self.cfg.rsync_bin, "-av", "--itemize-changes", "--info=progress2"]
+        if delete:
+            cmd.append("--delete")
         if dry:
             cmd.append("--dry-run")
         if password:

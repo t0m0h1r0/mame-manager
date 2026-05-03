@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +16,9 @@ class Rebuilder:
         self.shell = shell
         self.report = report
         self.indexer = indexer
-        self.reused = 0
+        self.unchanged = 0
         self.created = 0
+        self.unbuildable = 0
 
     def prepare(self) -> None:
         safe_rmtree(self.cfg.clean, self.cfg.work)
@@ -32,18 +32,24 @@ class Rebuilder:
         self.report.summary["rebuild_action"] = action
         self.prepare()
         if action == "skip":
-            self.report.note("rebuild cache matched, but clean_images is rebuilt from reusable archives before sync")
+            self.report.note("rebuild cache matched; no ROM archives need rebuilding")
+            self._write_results([], [])
+            return
         failures = []
+        unbuildable = []
         for rel, target in sorted(index.all_targets().items()):
-            if self._reuse_existing(rel, target):
+            if self._can_reuse_existing(rel, target):
+                self.unchanged += 1
+                continue
+            missing_entries = self._missing_entries(target, inventory)
+            if missing_entries:
+                unbuildable.append(f"{rel}: " + "; ".join(missing_entries[:10]))
+                self.unbuildable += 1
                 continue
             ok, reason = self._build_target(rel, target, inventory)
             if not ok:
                 failures.append(f"{rel}: {reason}")
-        self.report.write("rebuild_failures.txt", failures)
-        self.report.summary["existing_7z_reused"] = self.reused
-        self.report.summary["new_7z_created"] = self.created
-        self.report.summary["rebuild_failures"] = len(failures)
+        self._write_results(failures, unbuildable)
         if failures:
             raise FatalError(f"failed to build {len(failures)} ROM package(s); refusing to sync")
         atomic_write_json(
@@ -93,25 +99,19 @@ class Rebuilder:
             return "skip"
         return "full"
 
-    def _reuse_existing(self, rel: str, target: dict[str, Any]) -> bool:
-        src = self._existing_path(rel)
-        if not src.exists():
-            return False
-        rec = self.indexer.index_one(src)
-        if not archive_matches_target(rec, target):
-            return False
-        dst = self.cfg.clean / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
-        self.reused += 1
-        return True
-
     def _can_reuse_existing(self, rel: str, target: dict[str, Any]) -> bool:
         src = self._existing_path(rel)
         if not src.exists():
             return False
         rec = self.indexer.index_one(src)
         return archive_matches_target(rec, target)
+
+    def _missing_entries(self, target: dict[str, Any], inventory: Inventory) -> list[str]:
+        return [
+            f"{entry['name']} size={entry['size']} crc={entry['crc']}"
+            for entry in target["entries"]
+            if not inventory.candidates(entry)
+        ]
 
     def _existing_path(self, rel: str) -> Path:
         rel_path = Path(rel)
@@ -146,6 +146,14 @@ class Rebuilder:
             return False, "created archive does not match expected entries"
         self.created += 1
         return True, "ok"
+
+    def _write_results(self, failures: list[str], unbuildable: list[str]) -> None:
+        self.report.write("rebuild_failures.txt", failures)
+        self.report.write("rebuild_unbuildable.txt", unbuildable)
+        self.report.summary["unchanged_rom_packages"] = self.unchanged
+        self.report.summary["rebuilt_rom_packages"] = self.created
+        self.report.summary["unbuildable_rom_packages"] = self.unbuildable
+        self.report.summary["rebuild_failures"] = len(failures)
 
     def _extract_entry(self, candidate: dict[str, Any], staging: Path, out_name: str) -> bool:
         archive = Path(candidate["archive"])

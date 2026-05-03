@@ -25,9 +25,9 @@ QBITTORRENT_PASSWORD='password' ./mame_manager.py --scan-only --download-missing
 
 Current implementation supports `--merge-mode merged`.
 The default action is scan-only, and XML generation is not performed unless
-`--update-xml` is supplied.  Use `--rebuild` to build `clean_images/` and sync
-it back to `images/`.  Add `--backup` to also rsync `images/` to the backup
-URL.
+`--update-xml` is supplied.  Use `--rebuild` to build only changed ROM packages
+under `clean_images/` and sync that patch back to `images/`.  Add `--backup` to
+also rsync `images/` to the backup URL.
 
 ## Standard Workflow
 
@@ -114,11 +114,11 @@ mame_manager/
 
 - scan-only is the default and is read-only unless `--download-missing` is supplied.
 - `--update-xml` is required before generating or refreshing MAME XML.
-- `--rebuild` is required before rebuilding `clean_images/` or syncing to `images/`.
+- `--rebuild` is required before rebuilding changed ROM packages or syncing to `images/`.
 - `--backup` is required before rsyncing `images/` to the backup URL.
 - `--qbittorrent-dry-run` inspects WebUI matches without changing torrent priorities.
-- Normal rebuilds write to `work_mame/clean_images/` first.
-- `images/` updates go through `rsync --dry-run --itemize-changes`.
+- Normal rebuilds write only changed files to `work_mame/clean_images/` first.
+- `images/` updates go through `rsync --dry-run --itemize-changes` without `--delete`.
 - Large rsync changes are stopped unless `--force-large-sync` is used.
 
 ## Reports
@@ -145,3 +145,4 @@ Important files include:
 - `torrent_broken_archive_wanted_files.txt`
 - `qbittorrent_selected_files.txt`
 - `qbittorrent_unmatched_wanted_files.txt`
+- `rebuild_unbuildable.txt`
