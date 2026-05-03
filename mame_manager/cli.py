@@ -11,7 +11,7 @@ from .settings import RunConfig
 def parse_args(argv: list[str]) -> RunConfig:
     parser = argparse.ArgumentParser(description="Python-only MAME images auditor/rebuilder.")
     parser.add_argument("--scan-only", action="store_true", help="scan only; this is the default")
-    parser.add_argument("--rebuild", action="store_true", help="rebuild clean_images and run guarded rsync after scanning")
+    parser.add_argument("--rebuild", action="store_true", help="rebuild clean_images and sync it to images after scanning")
     parser.add_argument("--rebuild-plan-only", action="store_true")
     parser.add_argument("--torrent-plan", type=Path, default=defaults.DEFAULT_TORRENT_PLAN, metavar="FILE_LIST")
     parser.add_argument("--skip-xml", action="store_true")
@@ -22,6 +22,7 @@ def parse_args(argv: list[str]) -> RunConfig:
     parser.add_argument("--work", type=Path, default=defaults.DEFAULT_WORK_DIR)
     parser.add_argument("--rsync-pass", type=Path, default=defaults.DEFAULT_RSYNC_PASSWORD_FILE)
     parser.add_argument("--backup-url", default=defaults.DEFAULT_BACKUP_URL)
+    parser.add_argument("--backup-qnap", "--backup", dest="backup_qnap", action="store_true", help="also rsync images to the backup URL")
     parser.add_argument("--merge-mode", choices=["merged", "split", "non-merged"], default=defaults.DEFAULT_MERGE_MODE)
     parser.add_argument(
         "--scan-jobs",
@@ -105,6 +106,10 @@ def parse_args(argv: list[str]) -> RunConfig:
         parser.error("--scan-only and --rebuild cannot be used together")
     if args.rebuild and args.rebuild_plan_only:
         parser.error("--rebuild and --rebuild-plan-only cannot be used together")
+    if args.backup_qnap and not args.rebuild:
+        parser.error("--backup-qnap requires --rebuild")
+    if args.backup_qnap and args.no_qnap:
+        parser.error("--backup-qnap and --no-qnap cannot be used together")
     if not args.download_missing and (
         args.qbittorrent_dry_run
         or args.qbittorrent_resume
@@ -119,6 +124,7 @@ def parse_args(argv: list[str]) -> RunConfig:
         work=args.work,
         rsync_pass=args.rsync_pass,
         backup_url=args.backup_url,
+        backup_qnap=args.backup_qnap,
         merge_mode=args.merge_mode,
         scan_jobs=args.scan_jobs,
         compress_jobs=args.compress_jobs,

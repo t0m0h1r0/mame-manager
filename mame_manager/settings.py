@@ -11,6 +11,7 @@ class RunConfig:
     work: Path
     rsync_pass: Path
     backup_url: str
+    backup_qnap: bool
     merge_mode: str
     scan_jobs: int
     compress_jobs: int

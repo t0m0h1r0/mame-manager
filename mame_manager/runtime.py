@@ -176,7 +176,7 @@ class Validator:
         for exe, needed in ((self.cfg.sevenz_bin, True), (self.cfg.rsync_bin, not read_only)):
             if needed and not Shell.executable_exists(exe):
                 raise FatalError(f"required executable not found: {exe}")
-        if not read_only and not self.cfg.no_qnap and not self.cfg.rsync_pass.exists():
+        if not read_only and self.cfg.backup_qnap and not self.cfg.rsync_pass.exists():
             raise FatalError(f"rsync password file not found: {self.cfg.rsync_pass}")
         if self.cfg.qbittorrent_enabled:
             if not self.cfg.qbittorrent_password:

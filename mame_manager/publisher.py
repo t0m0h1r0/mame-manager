@@ -16,7 +16,7 @@ class SyncManager:
 
     def sync_all(self) -> None:
         self._sync(self.cfg.clean, self.cfg.images, "rsync_clean_to_images_dry_run.txt")
-        if not self.cfg.no_qnap:
+        if self.cfg.backup_qnap and not self.cfg.no_qnap:
             self._sync(self.cfg.images, self.cfg.backup_url, "rsync_images_to_qnap_dry_run.txt", password=self.cfg.rsync_pass)
 
     def _sync(self, src: Path, dst: Path | str, log_name: str, password: Path | None = None) -> None:
@@ -54,4 +54,3 @@ class SyncManager:
             elif re.match(r"^[<>ch\.\*][A-Za-z0-9\.\+][A-Za-z0-9\.\+]{9}\s", line):
                 count += 1
         return count
-
