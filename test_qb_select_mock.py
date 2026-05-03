@@ -28,7 +28,13 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"Ok.")
             return
-        if self.path in {"/api/v2/torrents/filePrio", "/api/v2/torrents/resume", "/api/v2/torrents/pause"}:
+        if self.path in {
+            "/api/v2/torrents/filePrio",
+            "/api/v2/torrents/resume",
+            "/api/v2/torrents/pause",
+            "/api/v2/torrents/start",
+            "/api/v2/torrents/stop",
+        }:
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"")

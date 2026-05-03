@@ -56,11 +56,20 @@ class QBittorrentClient:
 
     def resume(self, torrent_hash: str) -> None:
         body = parse.urlencode({"hashes": torrent_hash}).encode()
-        self._request("/api/v2/torrents/resume", body=body)
+        self._request_first(["/api/v2/torrents/resume", "/api/v2/torrents/start"], body=body)
 
     def pause(self, torrent_hash: str) -> None:
         body = parse.urlencode({"hashes": torrent_hash}).encode()
-        self._request("/api/v2/torrents/pause", body=body)
+        self._request_first(["/api/v2/torrents/pause", "/api/v2/torrents/stop"], body=body)
+
+    def _request_first(self, paths: list[str], body: bytes | None = None) -> bytes:
+        errors = []
+        for path in paths:
+            try:
+                return self._request(path, body=body)
+            except QBittorrentError as exc:
+                errors.append(str(exc))
+        raise QBittorrentError("; ".join(errors))
 
     def _request(self, path: str, body: bytes | None = None) -> bytes:
         req = request.Request(self.base + path, data=body)
