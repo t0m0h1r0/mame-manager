@@ -7,13 +7,13 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from .common import ARCHIVE_EXTS, SAMPLE_EXTS, VERSION, atomic_write_json, load_json, now_iso, sha256_bytes
-from .config import Config
-from .report import ReportManager
-from .shell import Shell
+from .runtime import ARCHIVE_EXTS, SAMPLE_EXTS, VERSION, atomic_write_json, load_json, now_iso, sha256_bytes
+from .settings import RunConfig
+from .reports import ReportManager
+from .runtime import Shell
 
 class Fingerprinter:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: RunConfig):
         self.cfg = cfg
 
     def collect(self) -> dict[str, Any]:
@@ -41,7 +41,7 @@ class Fingerprinter:
 
 
 class ArchiveIndexer:
-    def __init__(self, cfg: Config, shell: Shell, report: ReportManager):
+    def __init__(self, cfg: RunConfig, shell: Shell, report: ReportManager):
         self.cfg = cfg
         self.shell = shell
         self.report = report

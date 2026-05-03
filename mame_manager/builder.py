@@ -4,15 +4,15 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from .common import FatalError, atomic_write_json, load_json, now_iso, safe_rmtree
-from .config import Config
-from .dat import DatIndex
+from .runtime import VERSION, FatalError, atomic_write_json, load_json, now_iso, safe_rmtree
+from .settings import RunConfig
+from .catalog import DatIndex
 from .inventory import ArchiveIndexer, Inventory, archive_matches_target
-from .report import ReportManager
-from .shell import Shell
+from .reports import ReportManager
+from .runtime import Shell
 
 class Rebuilder:
-    def __init__(self, cfg: Config, shell: Shell, report: ReportManager, indexer: ArchiveIndexer):
+    def __init__(self, cfg: RunConfig, shell: Shell, report: ReportManager, indexer: ArchiveIndexer):
         self.cfg = cfg
         self.shell = shell
         self.report = report
@@ -168,4 +168,3 @@ class Rebuilder:
         extracted.replace(dst)
         safe_rmtree(tmpdir, self.cfg.work)
         return True
-

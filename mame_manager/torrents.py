@@ -4,12 +4,12 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from .common import FatalError
-from .config import Config
-from .report import ReportManager
+from .runtime import FatalError
+from .settings import RunConfig
+from .reports import ReportManager
 
 class TorrentPlanner:
-    def __init__(self, cfg: Config, report: ReportManager):
+    def __init__(self, cfg: RunConfig, report: ReportManager):
         self.cfg = cfg
         self.report = report
 

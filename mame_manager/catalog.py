@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from .common import VERSION, FatalError, parse_int, quote_cmd
-from .config import Config
-from .shell import Shell
+from .runtime import VERSION, FatalError, parse_int, quote_cmd
+from .settings import RunConfig
+from .runtime import Shell
 
 class DatExtractor:
-    def __init__(self, cfg: Config, shell: Shell):
+    def __init__(self, cfg: RunConfig, shell: Shell):
         self.cfg = cfg
         self.shell = shell
 

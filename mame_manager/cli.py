@@ -5,10 +5,10 @@ import os
 import sys
 from pathlib import Path
 
-from .app import MameRebuildApp
-from .config import Config
+from .workflow import MameRebuildApp
+from .settings import RunConfig
 
-def parse_args(argv: list[str]) -> Config:
+def parse_args(argv: list[str]) -> RunConfig:
     parser = argparse.ArgumentParser(description="Python-only MAME images auditor/rebuilder.")
     parser.add_argument("--scan-only", action="store_true")
     parser.add_argument("--rebuild-plan-only", action="store_true")
@@ -43,7 +43,7 @@ def parse_args(argv: list[str]) -> Config:
     parser.add_argument("--rom-scan-mode", default=None, help=argparse.SUPPRESS)
 
     args = parser.parse_args(argv)
-    return Config(
+    return RunConfig(
         mame_bin=args.mame_bin,
         images=args.images,
         new=args.new,

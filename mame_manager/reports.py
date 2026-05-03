@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
-from .common import VERSION, now_iso
-from .config import Config
+from .runtime import VERSION, now_iso
+from .settings import RunConfig
 
 class ReportManager:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: RunConfig):
         self.cfg = cfg
         self.cfg.reports.mkdir(parents=True, exist_ok=True)
         self.summary: dict[str, Any] = {

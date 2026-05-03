@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .config import Config
-from .dat import DatIndex
+from .settings import RunConfig
+from .catalog import DatIndex
 from .inventory import Inventory
-from .report import ReportManager
+from .reports import ReportManager
 
 class Auditor:
-    def __init__(self, cfg: Config, report: ReportManager):
+    def __init__(self, cfg: RunConfig, report: ReportManager):
         self.cfg = cfg
         self.report = report
 

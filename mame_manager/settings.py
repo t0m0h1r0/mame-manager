@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 @dataclass(frozen=True)
-class Config:
+class RunConfig:
     mame_bin: Path
     images: Path
     new: Path

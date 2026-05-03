@@ -3,13 +3,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .common import FatalError
-from .config import Config
-from .report import ReportManager
-from .shell import Shell
+from .runtime import FatalError
+from .settings import RunConfig
+from .reports import ReportManager
+from .runtime import Shell
 
 class SyncManager:
-    def __init__(self, cfg: Config, shell: Shell, report: ReportManager):
+    def __init__(self, cfg: RunConfig, shell: Shell, report: ReportManager):
         self.cfg = cfg
         self.shell = shell
         self.report = report

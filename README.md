@@ -41,19 +41,40 @@ torrent files to priority `0`, then sets wanted files to priority `1`.
 This helper only controls an existing qBittorrent torrent.  It does not fetch
 metadata from magnet links and does not download files by itself.
 
-## Structure
+## Architecture
 
-- `mame_manager.py`: Thin CLI entry point for the rebuild workflow.
-- `mame_manager/rebuild/cli.py`: Argument parsing and configuration assembly.
-- `mame_manager/rebuild/app.py`: Top-level workflow orchestration.
-- `mame_manager/rebuild/config.py`, `common.py`, `shell.py`, `report.py`: Shared configuration, utility, command, and report infrastructure.
-- `mame_manager/rebuild/dat.py`: MAME XML and software-list extraction/parsing.
-- `mame_manager/rebuild/inventory.py`: Input fingerprinting and ZIP/7z inventory indexing.
-- `mame_manager/rebuild/audit.py`, `torrent_plan.py`: Missing-file audit and selective torrent download planning.
-- `mame_manager/rebuild/chd.py`, `assets.py`: CHD/sample scanning and placement/reporting.
-- `mame_manager/rebuild/rebuilder.py`, `sync.py`, `validator.py`: Archive rebuild planning/execution, rsync guarded update, and preflight validation.
-- `qb_select_wanted.py`: qBittorrent file priority CLI.
-- `mame_manager/qbittorrent.py`: qBittorrent Web API adapter and file matching.
+The code is arranged around the data flow, not the order in which the original
+script happened to run:
+
+1. `catalog` defines what a correct MAME collection should contain.
+2. `inventory` observes what exists on disk.
+3. `audit`, `builder`, and `torrents` decide what is complete, missing,
+   reusable, rebuildable, or worth downloading.
+4. `media`, `publisher`, `qbittorrent`, and `runtime` perform edge effects:
+   CHD/sample handling, rsync, WebUI calls, filesystem, and subprocess work.
+
+CLI files stay thin.  Business logic lives in the package.
+
+```text
+mame_manager.py                  main audit/rebuild CLI wrapper
+qb_select_wanted.py              compatibility CLI wrapper for qBittorrent
+
+mame_manager/
+  cli.py                         argument parsing for mame_manager.py
+  workflow.py                    top-level use case orchestration
+  settings.py                    immutable runtime configuration
+  catalog.py                     MAME XML/software-list extraction and parsing
+  inventory.py                   input fingerprinting and archive indexing
+  audit.py                       ROM completeness audit and set/file counts
+  media.py                       CHD cache plus CHD/sample reporting/placement
+  builder.py                     clean_images archive reuse and rebuild
+  publisher.py                   guarded rsync publication
+  torrents.py                    wanted-file plan from missing/broken targets
+  qbittorrent.py                 qBittorrent Web API adapter and matching
+  qbittorrent_cli.py             qBittorrent selector CLI implementation
+  reports.py                     report and summary writing
+  runtime.py                     subprocess, hashing, JSON, and preflight tools
+```
 
 ## Safety
 

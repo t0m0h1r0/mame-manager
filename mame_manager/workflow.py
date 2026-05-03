@@ -5,22 +5,22 @@ import signal
 import sys
 from typing import Any
 
-from .assets import AssetManager
+from .media import AssetManager
 from .audit import Auditor
-from .chd import ChdCache
-from .common import VERSION, FatalError, atomic_write_json, sha256_bytes, sha256_file, now_iso
-from .config import Config
-from .dat import DatExtractor, DatIndex
+from .media import ChdCache
+from .runtime import VERSION, FatalError, atomic_write_json, sha256_bytes, sha256_file, now_iso
+from .settings import RunConfig
+from .catalog import DatExtractor, DatIndex
 from .inventory import ArchiveIndexer, Fingerprinter, Inventory
-from .rebuilder import Rebuilder
-from .report import ReportManager
-from .shell import Shell
-from .sync import SyncManager
-from .torrent_plan import TorrentPlanner
-from .validator import Validator
+from .builder import Rebuilder
+from .reports import ReportManager
+from .runtime import Shell
+from .publisher import SyncManager
+from .torrents import TorrentPlanner
+from .runtime import Validator
 
 class MameRebuildApp:
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: RunConfig):
         self.cfg = cfg
         self.shell = Shell()
         self.report = ReportManager(cfg)
