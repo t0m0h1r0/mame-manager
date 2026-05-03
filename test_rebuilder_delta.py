@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 
 from mame_manager.builder import Rebuilder
-from mame_manager.inventory import Inventory
+from mame_manager.inventory import Inventory, archive_matches_target
 from mame_manager.publisher import SyncManager
 from mame_manager.reports import ReportManager
 
@@ -77,8 +77,26 @@ def main() -> int:
         assert "--delete" not in patch_cmd
         assert "--delete" in backup_cmd
 
+    test_merged_archive_paths()
     print("delta rebuild tests passed")
     return 0
+
+
+def test_merged_archive_paths() -> None:
+    rec = {
+        "ok": True,
+        "entries": [
+            {"path": "parent.bin", "name": "parent.bin", "size": 1, "crc": "11111111"},
+            {"path": "clone/rom.bin", "name": "rom.bin", "size": 2, "crc": "22222222"},
+        ],
+    }
+    target = {
+        "entries": [
+            {"name": "parent.bin", "size": 1, "crc": "11111111"},
+            {"name": "rom.bin", "size": 2, "crc": "22222222"},
+        ],
+    }
+    assert archive_matches_target(rec, target)
 
 
 if __name__ == "__main__":
