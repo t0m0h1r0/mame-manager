@@ -11,7 +11,7 @@ class RunConfig:
     work: Path
     rsync_pass: Path
     backup_url: str
-    backup_qnap: bool
+    backup: bool
     merge_mode: str
     scan_jobs: int
     compress_jobs: int
@@ -19,7 +19,6 @@ class RunConfig:
     rebuild_plan_only: bool
     torrent_plan: Path | None
     update_xml: bool
-    no_qnap: bool
     rebuild_mode: str
     sevenz_bin: str
     rsync_bin: str

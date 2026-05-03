@@ -22,14 +22,13 @@ def parse_args(argv: list[str]) -> RunConfig:
         help="generate/update MAME XML before scanning",
     )
     parser.add_argument("--skip-xml", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--no-qnap", action="store_true")
     parser.add_argument("--mame-bin", type=Path, default=defaults.DEFAULT_MAME_BIN)
     parser.add_argument("--images", type=Path, default=defaults.DEFAULT_IMAGES_DIR)
     parser.add_argument("--new", type=Path, default=defaults.DEFAULT_NEW_DIR)
     parser.add_argument("--work", type=Path, default=defaults.DEFAULT_WORK_DIR)
     parser.add_argument("--rsync-pass", type=Path, default=defaults.DEFAULT_RSYNC_PASSWORD_FILE)
-    parser.add_argument("--backup-url", default=defaults.DEFAULT_BACKUP_URL)
-    parser.add_argument("--backup-qnap", "--backup", dest="backup_qnap", action="store_true", help="also rsync images to the backup URL")
+    parser.add_argument("--backup-url", default=defaults.env_default(defaults.ENV_BACKUP_URL, defaults.DEFAULT_BACKUP_URL))
+    parser.add_argument("--backup", action="store_true", help="also rsync images to the backup URL")
     parser.add_argument("--merge-mode", choices=["merged", "split", "non-merged"], default=defaults.DEFAULT_MERGE_MODE)
     parser.add_argument(
         "--scan-jobs",
@@ -115,10 +114,8 @@ def parse_args(argv: list[str]) -> RunConfig:
         parser.error("--rebuild and --rebuild-plan-only cannot be used together")
     if args.skip_xml and args.update_xml:
         parser.error("--skip-xml and --update-xml cannot be used together")
-    if args.backup_qnap and not args.rebuild:
-        parser.error("--backup-qnap requires --rebuild")
-    if args.backup_qnap and args.no_qnap:
-        parser.error("--backup-qnap and --no-qnap cannot be used together")
+    if args.backup and not args.rebuild:
+        parser.error("--backup requires --rebuild")
     if not args.download_missing and (
         args.qbittorrent_dry_run
         or args.qbittorrent_resume
@@ -133,7 +130,7 @@ def parse_args(argv: list[str]) -> RunConfig:
         work=args.work,
         rsync_pass=args.rsync_pass,
         backup_url=args.backup_url,
-        backup_qnap=args.backup_qnap,
+        backup=args.backup,
         merge_mode=args.merge_mode,
         scan_jobs=args.scan_jobs,
         compress_jobs=args.compress_jobs,
@@ -141,7 +138,6 @@ def parse_args(argv: list[str]) -> RunConfig:
         rebuild_plan_only=args.rebuild_plan_only,
         torrent_plan=args.torrent_plan,
         update_xml=args.update_xml,
-        no_qnap=args.no_qnap,
         rebuild_mode=args.rebuild_mode,
         sevenz_bin=args.sevenz_bin,
         rsync_bin=args.rsync_bin,
