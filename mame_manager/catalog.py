@@ -81,12 +81,11 @@ class DatIndex:
                 elem.clear()
                 continue
             parent = elem.attrib.get("cloneof") or machine
-            is_clone = parent != machine
             entries = []
             for rom in elem.findall("rom"):
                 if rom.attrib.get("status") == "nodump":
                     continue
-                if self.merge_mode == "merged" and is_clone and rom.attrib.get("merge"):
+                if self.merge_mode == "merged" and rom.attrib.get("merge"):
                     continue
                 name = rom.attrib.get("name")
                 size = rom.attrib.get("size")
@@ -126,12 +125,11 @@ class DatIndex:
                 if not sw_name:
                     continue
                 parent = software.attrib.get("cloneof") or sw_name
-                is_clone = parent != sw_name
                 entries = []
                 for rom in software.findall(".//rom"):
                     if rom.attrib.get("status") == "nodump":
                         continue
-                    if self.merge_mode == "merged" and is_clone and rom.attrib.get("merge"):
+                    if self.merge_mode == "merged" and rom.attrib.get("merge"):
                         continue
                     name = rom.attrib.get("name")
                     size = rom.attrib.get("size")
