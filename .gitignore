@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+
+work_mame/
+work_igir/
+
+.DS_Store
