@@ -43,7 +43,15 @@ metadata from magnet links and does not download files by itself.
 
 ## Structure
 
-- `mame_rebuild.py`: MAME audit/rebuild CLI.
+- `mame_rebuild.py`: Thin CLI entry point for the rebuild workflow.
+- `mame_manager/rebuild/cli.py`: Argument parsing and configuration assembly.
+- `mame_manager/rebuild/app.py`: Top-level workflow orchestration.
+- `mame_manager/rebuild/config.py`, `common.py`, `shell.py`, `report.py`: Shared configuration, utility, command, and report infrastructure.
+- `mame_manager/rebuild/dat.py`: MAME XML and software-list extraction/parsing.
+- `mame_manager/rebuild/inventory.py`: Input fingerprinting and ZIP/7z inventory indexing.
+- `mame_manager/rebuild/audit.py`, `torrent_plan.py`: Missing-file audit and selective torrent download planning.
+- `mame_manager/rebuild/chd.py`, `assets.py`: CHD/sample scanning and placement/reporting.
+- `mame_manager/rebuild/rebuilder.py`, `sync.py`, `validator.py`: Archive rebuild planning/execution, rsync guarded update, and preflight validation.
 - `qb_select_wanted.py`: qBittorrent file priority CLI.
 - `mame_manager/qbittorrent.py`: qBittorrent Web API adapter and file matching.
 
