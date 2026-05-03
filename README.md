@@ -13,14 +13,17 @@ hidden files and files under hidden directories are ignored.
 ## Basic Usage
 
 ```bash
+./mame_manager.py --skip-xml --scan-jobs 8
 ./mame_manager.py --scan-only --skip-xml --scan-jobs 8
 ./mame_manager.py --rebuild-plan-only --skip-xml --scan-jobs 8
 ./mame_manager.py --scan-only --skip-xml --torrent-plan torrent_file_list.txt
 QBITTORRENT_PASSWORD='password' ./mame_manager.py --scan-only --skip-xml --download-missing --qbittorrent-dry-run
-./mame_manager.py --skip-xml --merge-mode merged --no-qnap
+./mame_manager.py --rebuild --skip-xml --merge-mode merged --no-qnap
 ```
 
 Current implementation supports `--merge-mode merged`.
+The default action is scan-only.  Use `--rebuild` to build `clean_images/` and
+run the guarded rsync path.
 
 ## Standard Workflow
 
@@ -36,8 +39,8 @@ In practice:
 1. Run a dry run with `--download-missing --qbittorrent-dry-run`.
 2. If the selected files look right, run again without `--qbittorrent-dry-run`
    and optionally with `--qbittorrent-resume`.
-3. After qBittorrent finishes downloading into `Downloads/`, run a normal
-   rebuild without `--scan-only`.
+3. After qBittorrent finishes downloading into `Downloads/`, run with
+   `--rebuild`.
 
 ## qBittorrent Download Selection
 
@@ -104,7 +107,8 @@ mame_manager/
 
 ## Safety
 
-- `--scan-only` is read-only unless `--download-missing` is supplied.
+- scan-only is the default and is read-only unless `--download-missing` is supplied.
+- `--rebuild` is required before rebuilding `clean_images/` or running rsync.
 - `--qbittorrent-dry-run` inspects WebUI matches without changing torrent priorities.
 - Normal rebuilds write to `work_mame/clean_images/` first.
 - `images/` updates go through `rsync --dry-run --itemize-changes`.

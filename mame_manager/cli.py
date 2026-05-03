@@ -10,7 +10,8 @@ from .settings import RunConfig
 
 def parse_args(argv: list[str]) -> RunConfig:
     parser = argparse.ArgumentParser(description="Python-only MAME images auditor/rebuilder.")
-    parser.add_argument("--scan-only", action="store_true")
+    parser.add_argument("--scan-only", action="store_true", help="scan only; this is the default")
+    parser.add_argument("--rebuild", action="store_true", help="rebuild clean_images and run guarded rsync after scanning")
     parser.add_argument("--rebuild-plan-only", action="store_true")
     parser.add_argument("--torrent-plan", type=Path, default=defaults.DEFAULT_TORRENT_PLAN, metavar="FILE_LIST")
     parser.add_argument("--skip-xml", action="store_true")
@@ -100,6 +101,10 @@ def parse_args(argv: list[str]) -> RunConfig:
     parser.add_argument("--rom-scan-mode", default=defaults.DEFAULT_COMPAT_OPTION, help=argparse.SUPPRESS)
 
     args = parser.parse_args(argv)
+    if args.scan_only and args.rebuild:
+        parser.error("--scan-only and --rebuild cannot be used together")
+    if args.rebuild and args.rebuild_plan_only:
+        parser.error("--rebuild and --rebuild-plan-only cannot be used together")
     if not args.download_missing and (
         args.qbittorrent_dry_run
         or args.qbittorrent_resume
@@ -117,7 +122,7 @@ def parse_args(argv: list[str]) -> RunConfig:
         merge_mode=args.merge_mode,
         scan_jobs=args.scan_jobs,
         compress_jobs=args.compress_jobs,
-        scan_only=args.scan_only,
+        scan_only=not (args.rebuild or args.rebuild_plan_only),
         rebuild_plan_only=args.rebuild_plan_only,
         torrent_plan=args.torrent_plan,
         skip_xml=args.skip_xml,

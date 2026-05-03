@@ -47,3 +47,20 @@ class ReportManager:
                 lines.append(f"{key}: {val}")
         self.write("summary.txt", lines)
 
+    def print_scan_summary(self) -> None:
+        print("scan summary:", flush=True)
+        self._print_json_summary("rom_sets")
+        self._print_json_summary("rom_file_entries")
+        self._print_json_summary("missing_rom_entries")
+        self._print_json_summary("missing_chds")
+        self._print_plain_summary("missing_samples")
+        self._print_plain_summary("archive_errors")
+        self._print_json_summary("qbittorrent")
+
+    def _print_json_summary(self, key: str) -> None:
+        if key in self.summary:
+            print(f"{key}: {json.dumps(self.summary[key], ensure_ascii=False, sort_keys=True)}", flush=True)
+
+    def _print_plain_summary(self, key: str) -> None:
+        if key in self.summary:
+            print(f"{key}: {self.summary[key]}", flush=True)
