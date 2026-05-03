@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
+from . import defaults
 from .workflow import MameRebuildApp
 from .settings import RunConfig
 
@@ -12,26 +12,34 @@ def parse_args(argv: list[str]) -> RunConfig:
     parser = argparse.ArgumentParser(description="Python-only MAME images auditor/rebuilder.")
     parser.add_argument("--scan-only", action="store_true")
     parser.add_argument("--rebuild-plan-only", action="store_true")
-    parser.add_argument("--torrent-plan", type=Path, default=None, metavar="FILE_LIST")
+    parser.add_argument("--torrent-plan", type=Path, default=defaults.DEFAULT_TORRENT_PLAN, metavar="FILE_LIST")
     parser.add_argument("--skip-xml", action="store_true")
     parser.add_argument("--no-qnap", action="store_true")
-    parser.add_argument("--mame-bin", type=Path, default=Path("mame/mame"))
-    parser.add_argument("--images", type=Path, default=Path("images"))
-    parser.add_argument("--new", type=Path, default=Path("new"))
-    parser.add_argument("--work", type=Path, default=Path("work_mame"))
-    parser.add_argument("--rsync-pass", type=Path, default=Path(".rsync"))
-    parser.add_argument("--backup-url", default="rsync://rsync@qnap2/Game/Multi-Platform/images/")
-    parser.add_argument("--merge-mode", choices=["merged", "split", "non-merged"], default="merged")
-    parser.add_argument("--scan-jobs", type=int, default=int(os.environ.get("SCAN_JOBS", "16")))
-    parser.add_argument("--compress-jobs", type=int, default=int(os.environ.get("COMPRESS_JOBS", "4")))
-    parser.add_argument("--rebuild-mode", choices=["auto", "full", "skip"], default="auto")
-    parser.add_argument("--7z-bin", dest="sevenz_bin", default="7z")
-    parser.add_argument("--rsync-bin", default="rsync")
-    parser.add_argument("--chdman-bin", default="chdman")
+    parser.add_argument("--mame-bin", type=Path, default=defaults.DEFAULT_MAME_BIN)
+    parser.add_argument("--images", type=Path, default=defaults.DEFAULT_IMAGES_DIR)
+    parser.add_argument("--new", type=Path, default=defaults.DEFAULT_NEW_DIR)
+    parser.add_argument("--work", type=Path, default=defaults.DEFAULT_WORK_DIR)
+    parser.add_argument("--rsync-pass", type=Path, default=defaults.DEFAULT_RSYNC_PASSWORD_FILE)
+    parser.add_argument("--backup-url", default=defaults.DEFAULT_BACKUP_URL)
+    parser.add_argument("--merge-mode", choices=["merged", "split", "non-merged"], default=defaults.DEFAULT_MERGE_MODE)
+    parser.add_argument(
+        "--scan-jobs",
+        type=int,
+        default=defaults.env_int_default(defaults.ENV_SCAN_JOBS, defaults.DEFAULT_SCAN_JOBS),
+    )
+    parser.add_argument(
+        "--compress-jobs",
+        type=int,
+        default=defaults.env_int_default(defaults.ENV_COMPRESS_JOBS, defaults.DEFAULT_COMPRESS_JOBS),
+    )
+    parser.add_argument("--rebuild-mode", choices=["auto", "full", "skip"], default=defaults.DEFAULT_REBUILD_MODE)
+    parser.add_argument("--7z-bin", dest="sevenz_bin", default=defaults.DEFAULT_SEVENZ_BIN)
+    parser.add_argument("--rsync-bin", default=defaults.DEFAULT_RSYNC_BIN)
+    parser.add_argument("--chdman-bin", default=defaults.DEFAULT_CHDMAN_BIN)
     parser.add_argument("--no-chdman", action="store_true")
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--force-large-sync", action="store_true")
-    parser.add_argument("--large-sync-threshold", type=int, default=1000)
+    parser.add_argument("--large-sync-threshold", type=int, default=defaults.DEFAULT_LARGE_SYNC_THRESHOLD)
     parser.add_argument(
         "--download-missing",
         action="store_true",
@@ -42,26 +50,54 @@ def parse_args(argv: list[str]) -> RunConfig:
         "--qbittorrent-url",
         "--qb-url",
         dest="qbittorrent_url",
-        default=os.environ.get("QBITTORRENT_URL", "http://localhost:8080"),
+        default=defaults.env_default(defaults.ENV_QBITTORRENT_URL, defaults.DEFAULT_QBITTORRENT_URL),
     )
-    qb.add_argument("--qbittorrent-user", "--qb-user", dest="qbittorrent_user", default=os.environ.get("QBITTORRENT_USER", "admin"))
-    qb.add_argument("--qbittorrent-password", "--qb-password", dest="qbittorrent_password", default=os.environ.get("QBITTORRENT_PASSWORD"))
-    qb.add_argument("--qbittorrent-hash", "--qb-hash", dest="qbittorrent_hash", default=None)
-    qb.add_argument("--qbittorrent-name", "--qb-name", dest="qbittorrent_name", default=None)
-    qb.add_argument("--qbittorrent-priority", "--qb-priority", dest="qbittorrent_priority", type=int, default=1)
-    qb.add_argument("--qbittorrent-skip-priority", "--qb-skip-priority", dest="qbittorrent_skip_priority", type=int, default=0)
+    qb.add_argument(
+        "--qbittorrent-user",
+        "--qb-user",
+        dest="qbittorrent_user",
+        default=defaults.env_default(defaults.ENV_QBITTORRENT_USER, defaults.DEFAULT_QBITTORRENT_USER),
+    )
+    qb.add_argument(
+        "--qbittorrent-password",
+        "--qb-password",
+        dest="qbittorrent_password",
+        default=defaults.env_optional(defaults.ENV_QBITTORRENT_PASSWORD),
+    )
+    qb.add_argument("--qbittorrent-hash", "--qb-hash", dest="qbittorrent_hash", default=defaults.DEFAULT_QBITTORRENT_HASH)
+    qb.add_argument("--qbittorrent-name", "--qb-name", dest="qbittorrent_name", default=defaults.DEFAULT_QBITTORRENT_NAME)
+    qb.add_argument(
+        "--qbittorrent-priority",
+        "--qb-priority",
+        dest="qbittorrent_priority",
+        type=int,
+        default=defaults.DEFAULT_QBITTORRENT_PRIORITY,
+    )
+    qb.add_argument(
+        "--qbittorrent-skip-priority",
+        "--qb-skip-priority",
+        dest="qbittorrent_skip_priority",
+        type=int,
+        default=defaults.DEFAULT_QBITTORRENT_SKIP_PRIORITY,
+    )
     qb.add_argument("--qbittorrent-resume", "--qb-resume", dest="qbittorrent_resume", action="store_true")
     qb.add_argument("--qbittorrent-dry-run", "--qb-dry-run", dest="qbittorrent_dry_run", action="store_true")
-    qb.add_argument("--qbittorrent-timeout", "--qb-timeout", dest="qbittorrent_timeout", type=int, default=30)
+    qb.add_argument(
+        "--qbittorrent-timeout",
+        "--qb-timeout",
+        dest="qbittorrent_timeout",
+        type=int,
+        default=defaults.DEFAULT_QBITTORRENT_TIMEOUT,
+    )
 
     # Backward-compatible no-op options from the Igir-based prototype.
-    parser.add_argument("--igir-bin", default=None, help=argparse.SUPPRESS)
-    parser.add_argument("--igir-scan-command", default=None, help=argparse.SUPPRESS)
-    parser.add_argument("--igir-checksum-max", default=None, help=argparse.SUPPRESS)
-    parser.add_argument("--igir-checksum-archives", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--igir-bin", default=defaults.DEFAULT_COMPAT_OPTION, help=argparse.SUPPRESS)
+    parser.add_argument("--igir-scan-command", default=defaults.DEFAULT_COMPAT_OPTION, help=argparse.SUPPRESS)
+    parser.add_argument("--igir-checksum-max", default=defaults.DEFAULT_COMPAT_OPTION, help=argparse.SUPPRESS)
+    parser.add_argument("--igir-checksum-archives", default=defaults.DEFAULT_COMPAT_OPTION, help=argparse.SUPPRESS)
     parser.add_argument("--no-igir-checksum-quick", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--allow-igir-parse-warnings", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--rom-scan-mode", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--rom-scan-mode", default=defaults.DEFAULT_COMPAT_OPTION, help=argparse.SUPPRESS)
 
     args = parser.parse_args(argv)
     if not args.download_missing and (

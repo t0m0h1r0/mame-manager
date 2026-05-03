@@ -65,6 +65,7 @@ mame_manager.py                  main audit/rebuild/qBittorrent CLI wrapper
 
 mame_manager/
   cli.py                         argument parsing for mame_manager.py
+  defaults.py                    default paths, commands, env vars, and WebUI values
   workflow.py                    top-level use case orchestration
   settings.py                    immutable runtime configuration
   catalog.py                     MAME XML/software-list extraction and parsing
