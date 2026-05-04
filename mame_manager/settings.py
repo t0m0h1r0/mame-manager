@@ -10,7 +10,7 @@ class RunConfig:
     new: Path
     work: Path
     rsync_pass: Path
-    backup_url: str
+    backup_url: str | None
     backup: bool
     restore: bool
     merge_mode: str

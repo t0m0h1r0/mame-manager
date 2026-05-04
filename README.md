@@ -20,8 +20,8 @@ hidden files and files under hidden directories are ignored.
 ./mame_manager.py --scan-only --torrent-plan torrent_file_list.txt
 QBITTORRENT_PASSWORD='password' ./mame_manager.py --scan-only --download-missing --qbittorrent-dry-run
 ./mame_manager.py --rebuild --merge-mode merged
-./mame_manager.py --rebuild --merge-mode merged --backup
-./mame_manager.py --restore
+BACKUP_URL='rsync://rsync@backup-host-or-ip/Game/Multi-Platform/images/' ./mame_manager.py --rebuild --merge-mode merged --backup
+BACKUP_URL='rsync://rsync@backup-host-or-ip/Game/Multi-Platform/images/' ./mame_manager.py --restore
 ```
 
 Current implementation supports `--merge-mode merged`.
@@ -30,6 +30,29 @@ The default action is scan-only, and XML generation is not performed unless
 that use incoming files from `Downloads/`, write them under `clean_images/`, and
 sync that patch back to `images/`.  Add `--backup` to also rsync `images/` to the
 backup URL.  Use `--restore` to rsync the backup URL back to `images/`.
+
+## Local Configuration
+
+Defaults live in `mame_manager/defaults.py`.  Machine-specific values can be
+kept outside git in:
+
+```text
+~/.config/mame-manager/config.env
+```
+
+Example:
+
+```text
+BACKUP_URL=rsync://rsync@backup-host-or-ip/Game/Multi-Platform/images/
+QBITTORRENT_PASSWORD=password
+SCAN_JOBS=16
+COMPRESS_JOBS=4
+```
+
+Environment variables still win over the config file.  A custom config file can
+be selected with `--config` or `MAME_MANAGER_CONFIG`.  `--backup` and `--restore`
+require a real `BACKUP_URL` or `--backup-url`; there is no built-in backup host
+name.
 
 ## Standard Workflow
 

@@ -9,7 +9,15 @@ from .workflow import MameRebuildApp
 from .settings import RunConfig
 
 def parse_args(argv: list[str]) -> RunConfig:
-    parser = argparse.ArgumentParser(description="Python-only MAME images auditor/rebuilder.")
+    base = argparse.ArgumentParser(add_help=False)
+    base.add_argument("--config", type=Path, default=defaults.config_file_default())
+    base_args, _ = base.parse_known_args(argv)
+    config_defaults = defaults.load_config_env(base_args.config)
+
+    parser = argparse.ArgumentParser(
+        description="Python-only MAME images auditor/rebuilder.",
+        parents=[base],
+    )
     parser.add_argument("--scan-only", action="store_true", help="scan only; this is the default")
     parser.add_argument("--rebuild", action="store_true", help="rebuild clean_images and sync it to images after scanning")
     parser.add_argument("--rebuild-plan-only", action="store_true")
@@ -27,19 +35,23 @@ def parse_args(argv: list[str]) -> RunConfig:
     parser.add_argument("--new", type=Path, default=defaults.DEFAULT_NEW_DIR)
     parser.add_argument("--work", type=Path, default=defaults.DEFAULT_WORK_DIR)
     parser.add_argument("--rsync-pass", type=Path, default=defaults.DEFAULT_RSYNC_PASSWORD_FILE)
-    parser.add_argument("--backup-url", default=defaults.env_default(defaults.ENV_BACKUP_URL, defaults.DEFAULT_BACKUP_URL))
+    parser.add_argument(
+        "--backup-url",
+        default=defaults.configured_default(defaults.ENV_BACKUP_URL, defaults.DEFAULT_BACKUP_URL, config_defaults),
+        help="backup/restore source URL; can also be set with BACKUP_URL or the config file",
+    )
     parser.add_argument("--backup", action="store_true", help="also rsync images to the backup URL")
     parser.add_argument("--restore", action="store_true", help="rsync the backup URL back to images")
     parser.add_argument("--merge-mode", choices=["merged", "split", "non-merged"], default=defaults.DEFAULT_MERGE_MODE)
     parser.add_argument(
         "--scan-jobs",
         type=int,
-        default=defaults.env_int_default(defaults.ENV_SCAN_JOBS, defaults.DEFAULT_SCAN_JOBS),
+        default=defaults.configured_int_default(defaults.ENV_SCAN_JOBS, defaults.DEFAULT_SCAN_JOBS, config_defaults),
     )
     parser.add_argument(
         "--compress-jobs",
         type=int,
-        default=defaults.env_int_default(defaults.ENV_COMPRESS_JOBS, defaults.DEFAULT_COMPRESS_JOBS),
+        default=defaults.configured_int_default(defaults.ENV_COMPRESS_JOBS, defaults.DEFAULT_COMPRESS_JOBS, config_defaults),
     )
     parser.add_argument("--rebuild-mode", choices=["auto", "full", "skip"], default=defaults.DEFAULT_REBUILD_MODE)
     parser.add_argument("--7z-bin", dest="sevenz_bin", default=defaults.DEFAULT_SEVENZ_BIN)
@@ -59,19 +71,27 @@ def parse_args(argv: list[str]) -> RunConfig:
         "--qbittorrent-url",
         "--qb-url",
         dest="qbittorrent_url",
-        default=defaults.env_default(defaults.ENV_QBITTORRENT_URL, defaults.DEFAULT_QBITTORRENT_URL),
+        default=defaults.configured_default(
+            defaults.ENV_QBITTORRENT_URL,
+            defaults.DEFAULT_QBITTORRENT_URL,
+            config_defaults,
+        ),
     )
     qb.add_argument(
         "--qbittorrent-user",
         "--qb-user",
         dest="qbittorrent_user",
-        default=defaults.env_default(defaults.ENV_QBITTORRENT_USER, defaults.DEFAULT_QBITTORRENT_USER),
+        default=defaults.configured_default(
+            defaults.ENV_QBITTORRENT_USER,
+            defaults.DEFAULT_QBITTORRENT_USER,
+            config_defaults,
+        ),
     )
     qb.add_argument(
         "--qbittorrent-password",
         "--qb-password",
         dest="qbittorrent_password",
-        default=defaults.env_optional(defaults.ENV_QBITTORRENT_PASSWORD),
+        default=defaults.configured_optional(defaults.ENV_QBITTORRENT_PASSWORD, config_defaults),
     )
     qb.add_argument("--qbittorrent-hash", "--qb-hash", dest="qbittorrent_hash", default=defaults.DEFAULT_QBITTORRENT_HASH)
     qb.add_argument("--qbittorrent-name", "--qb-name", dest="qbittorrent_name", default=defaults.DEFAULT_QBITTORRENT_NAME)

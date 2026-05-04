@@ -17,19 +17,21 @@ class SyncManager:
     def sync_all(self) -> None:
         self._sync(self.cfg.clean, self.cfg.images, "rsync_clean_to_images_dry_run.txt", delete=False)
         if self.cfg.backup:
+            backup_url = self._backup_url()
             self._sync(
                 self.cfg.images,
-                self.cfg.backup_url,
+                backup_url,
                 "rsync_images_to_backup_dry_run.txt",
-                password=self._password_for(self.cfg.images, self.cfg.backup_url),
+                password=self._password_for(self.cfg.images, backup_url),
             )
 
     def restore_images(self) -> None:
+        backup_url = self._backup_url()
         self._sync(
-            self.cfg.backup_url,
+            backup_url,
             self.cfg.images,
             "rsync_backup_to_images_dry_run.txt",
-            password=self._password_for(self.cfg.backup_url, self.cfg.images),
+            password=self._password_for(backup_url, self.cfg.images),
             delete=True,
         )
 
@@ -65,6 +67,11 @@ class SyncManager:
         if any(str(endpoint).startswith("rsync://") for endpoint in endpoints):
             return self.cfg.rsync_pass
         return None
+
+    def _backup_url(self) -> str:
+        if not self.cfg.backup_url:
+            raise FatalError("--backup-url or BACKUP_URL is required for backup/restore")
+        return self.cfg.backup_url
 
     @staticmethod
     def _count_changes(log: Path) -> int:

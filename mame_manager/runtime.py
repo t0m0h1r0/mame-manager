@@ -5,10 +5,12 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import urlparse
 
 VERSION = 2
 ARCHIVE_EXTS = {".zip", ".7z"}
@@ -180,8 +182,13 @@ class Validator:
         for exe, needed in ((self.cfg.sevenz_bin, needs_7z), (self.cfg.rsync_bin, needs_rsync)):
             if needed and not Shell.executable_exists(exe):
                 raise FatalError(f"required executable not found: {exe}")
-        if (self.cfg.backup or self.cfg.restore) and str(self.cfg.backup_url).startswith("rsync://") and not self.cfg.rsync_pass.exists():
-            raise FatalError(f"rsync password file not found: {self.cfg.rsync_pass}")
+        if self.cfg.backup or self.cfg.restore:
+            if not self.cfg.backup_url:
+                raise FatalError("--backup-url or BACKUP_URL is required for backup/restore")
+            if str(self.cfg.backup_url).startswith("rsync://"):
+                self._validate_rsync_url(self.cfg.backup_url)
+                if not self.cfg.rsync_pass.exists():
+                    raise FatalError(f"rsync password file not found: {self.cfg.rsync_pass}")
         if self.cfg.qbittorrent_enabled:
             if not self.cfg.qbittorrent_password:
                 raise FatalError("--qbittorrent-password or QBITTORRENT_PASSWORD is required when qBittorrent is enabled")
@@ -189,3 +196,17 @@ class Validator:
                 raise FatalError("qBittorrent priorities must be >= 0")
             if self.cfg.qbittorrent_timeout < 1:
                 raise FatalError("--qbittorrent-timeout must be >= 1")
+
+    @staticmethod
+    def _validate_rsync_url(url: str) -> None:
+        parsed = urlparse(url)
+        host = parsed.hostname
+        if not host:
+            raise FatalError(f"invalid rsync URL: {url}")
+        try:
+            socket.getaddrinfo(host, parsed.port or 873)
+        except socket.gaierror:
+            raise FatalError(
+                f"backup URL host cannot be resolved: {host}; "
+                "set --backup-url or BACKUP_URL to a reachable hostname or IP address"
+            )
