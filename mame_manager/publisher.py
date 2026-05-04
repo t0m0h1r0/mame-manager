@@ -17,9 +17,23 @@ class SyncManager:
     def sync_all(self) -> None:
         self._sync(self.cfg.clean, self.cfg.images, "rsync_clean_to_images_dry_run.txt", delete=False)
         if self.cfg.backup:
-            self._sync(self.cfg.images, self.cfg.backup_url, "rsync_images_to_backup_dry_run.txt", password=self.cfg.rsync_pass)
+            self._sync(
+                self.cfg.images,
+                self.cfg.backup_url,
+                "rsync_images_to_backup_dry_run.txt",
+                password=self._password_for(self.cfg.images, self.cfg.backup_url),
+            )
 
-    def _sync(self, src: Path, dst: Path | str, log_name: str, password: Path | None = None, delete: bool = True) -> None:
+    def restore_images(self) -> None:
+        self._sync(
+            self.cfg.backup_url,
+            self.cfg.images,
+            "rsync_backup_to_images_dry_run.txt",
+            password=self._password_for(self.cfg.backup_url, self.cfg.images),
+            delete=True,
+        )
+
+    def _sync(self, src: Path | str, dst: Path | str, log_name: str, password: Path | None = None, delete: bool = True) -> None:
         dry_log = self.cfg.reports / log_name
         dry_cmd = self._cmd(src, dst, dry=True, password=password, delete=delete)
         self.shell.run_to_log(dry_cmd, dry_log, check=True)
@@ -33,7 +47,7 @@ class SyncManager:
                 raise FatalError("user declined rsync")
         self.shell.run(self._cmd(src, dst, dry=False, password=password, delete=delete), check=True)
 
-    def _cmd(self, src: Path, dst: Path | str, dry: bool, password: Path | None, delete: bool) -> list[str | Path]:
+    def _cmd(self, src: Path | str, dst: Path | str, dry: bool, password: Path | None, delete: bool) -> list[str | Path]:
         cmd: list[str | Path] = [self.cfg.rsync_bin, "-av", "--itemize-changes", "--info=progress2"]
         if delete:
             cmd.append("--delete")
@@ -46,6 +60,11 @@ class SyncManager:
             src_s += "/"
         cmd.extend([src_s, str(dst)])
         return cmd
+
+    def _password_for(self, *endpoints: Path | str) -> Path | None:
+        if any(str(endpoint).startswith("rsync://") for endpoint in endpoints):
+            return self.cfg.rsync_pass
+        return None
 
     @staticmethod
     def _count_changes(log: Path) -> int:

@@ -135,6 +135,7 @@ class Shell:
         log.parent.mkdir(parents=True, exist_ok=True)
         with log.open("w", encoding="utf-8") as f:
             f.write("$ " + quote_cmd(cmd) + "\n\n")
+            f.flush()
             proc = subprocess.run(
                 [str(x) for x in cmd],
                 cwd=str(cwd) if cwd else None,
@@ -169,14 +170,17 @@ class Validator:
             raise FatalError("--scan-jobs and --compress-jobs must be >= 1")
         if not self.cfg.images.exists():
             raise FatalError(f"images directory not found: {self.cfg.images}")
-        self.cfg.new.mkdir(parents=True, exist_ok=True)
+        if not self.cfg.restore:
+            self.cfg.new.mkdir(parents=True, exist_ok=True)
         if self.cfg.update_xml and not self.cfg.mame_bin.exists():
             raise FatalError(f"MAME binary not found: {self.cfg.mame_bin}")
         read_only = self.cfg.scan_only or self.cfg.rebuild_plan_only or bool(self.cfg.torrent_plan)
-        for exe, needed in ((self.cfg.sevenz_bin, True), (self.cfg.rsync_bin, not read_only)):
+        needs_rsync = self.cfg.restore or not read_only
+        needs_7z = not self.cfg.restore
+        for exe, needed in ((self.cfg.sevenz_bin, needs_7z), (self.cfg.rsync_bin, needs_rsync)):
             if needed and not Shell.executable_exists(exe):
                 raise FatalError(f"required executable not found: {exe}")
-        if not read_only and self.cfg.backup and not self.cfg.rsync_pass.exists():
+        if (self.cfg.backup or self.cfg.restore) and str(self.cfg.backup_url).startswith("rsync://") and not self.cfg.rsync_pass.exists():
             raise FatalError(f"rsync password file not found: {self.cfg.rsync_pass}")
         if self.cfg.qbittorrent_enabled:
             if not self.cfg.qbittorrent_password:

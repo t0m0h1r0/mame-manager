@@ -30,6 +30,12 @@ class MameRebuildApp:
         try:
             self.report.phase("validate")
             Validator(self.cfg).validate()
+            if self.cfg.restore:
+                self.report.phase("restore images")
+                SyncManager(self.cfg, self.shell, self.report).restore_images()
+                self.report.phase("done")
+                self.report.finish()
+                return 0
             self.report.phase("extract DAT")
             DatExtractor(self.cfg, self.shell).extract()
             self.report.phase("parse DAT")

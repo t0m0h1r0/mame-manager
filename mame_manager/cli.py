@@ -29,6 +29,7 @@ def parse_args(argv: list[str]) -> RunConfig:
     parser.add_argument("--rsync-pass", type=Path, default=defaults.DEFAULT_RSYNC_PASSWORD_FILE)
     parser.add_argument("--backup-url", default=defaults.env_default(defaults.ENV_BACKUP_URL, defaults.DEFAULT_BACKUP_URL))
     parser.add_argument("--backup", action="store_true", help="also rsync images to the backup URL")
+    parser.add_argument("--restore", action="store_true", help="rsync the backup URL back to images")
     parser.add_argument("--merge-mode", choices=["merged", "split", "non-merged"], default=defaults.DEFAULT_MERGE_MODE)
     parser.add_argument(
         "--scan-jobs",
@@ -112,6 +113,10 @@ def parse_args(argv: list[str]) -> RunConfig:
         parser.error("--scan-only and --rebuild cannot be used together")
     if args.rebuild and args.rebuild_plan_only:
         parser.error("--rebuild and --rebuild-plan-only cannot be used together")
+    if args.restore and (args.scan_only or args.rebuild or args.rebuild_plan_only):
+        parser.error("--restore cannot be combined with scan or rebuild options")
+    if args.restore and (args.backup or args.update_xml or args.download_missing or args.torrent_plan):
+        parser.error("--restore cannot be combined with backup, XML update, torrent, or download actions")
     if args.skip_xml and args.update_xml:
         parser.error("--skip-xml and --update-xml cannot be used together")
     if args.backup and not args.rebuild:
@@ -131,10 +136,11 @@ def parse_args(argv: list[str]) -> RunConfig:
         rsync_pass=args.rsync_pass,
         backup_url=args.backup_url,
         backup=args.backup,
+        restore=args.restore,
         merge_mode=args.merge_mode,
         scan_jobs=args.scan_jobs,
         compress_jobs=args.compress_jobs,
-        scan_only=not (args.rebuild or args.rebuild_plan_only),
+        scan_only=not (args.rebuild or args.rebuild_plan_only or args.restore),
         rebuild_plan_only=args.rebuild_plan_only,
         torrent_plan=args.torrent_plan,
         update_xml=args.update_xml,

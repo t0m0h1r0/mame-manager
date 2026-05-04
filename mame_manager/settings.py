@@ -12,6 +12,7 @@ class RunConfig:
     rsync_pass: Path
     backup_url: str
     backup: bool
+    restore: bool
     merge_mode: str
     scan_jobs: int
     compress_jobs: int

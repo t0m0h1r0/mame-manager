@@ -41,6 +41,7 @@ def main() -> int:
             rebuild_mode="full",
             scan_only=False,
             rebuild_plan_only=False,
+            restore=False,
             merge_mode="merged",
             rsync_bin="rsync",
             rebuild_cache_file=root / "work" / "rebuild_cache.json",
@@ -95,8 +96,12 @@ def main() -> int:
         sync = SyncManager(cfg, SimpleNamespace(), report)
         patch_cmd = sync._cmd(cfg.clean, cfg.images, dry=True, password=None, delete=False)
         backup_cmd = sync._cmd(cfg.images, "rsync://backup/images/", dry=True, password=None, delete=True)
+        restore_cmd = sync._cmd("rsync://backup/images/", cfg.images, dry=True, password=cfg.rebuild_cache_file, delete=True)
         assert "--delete" not in patch_cmd
         assert "--delete" in backup_cmd
+        assert "--delete" in restore_cmd
+        assert str(restore_cmd[-2]).endswith("/")
+        assert restore_cmd[-1] == str(cfg.images)
 
     test_merged_archive_paths()
     print("delta rebuild tests passed")
