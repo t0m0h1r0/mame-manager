@@ -10,8 +10,8 @@ DEFAULT_MAME_BIN = Path("mame/mame")
 DEFAULT_IMAGES_DIR = Path("images")
 DEFAULT_NEW_DIR = Path("Downloads")
 DEFAULT_WORK_DIR = Path("work_mame")
-DEFAULT_RSYNC_PASSWORD_FILE = Path(".rsync")
-DEFAULT_BACKUP_URL = None
+DEFAULT_RSYNC_PASSWORD_FILE = Path.home() / ".rsync"
+DEFAULT_BACKUP_URL = "rsync://rsync@192.168.1.112/Game/Multi-Platform/images/"
 DEFAULT_TORRENT_PLAN = None
 
 DEFAULT_MERGE_MODE = "merged"

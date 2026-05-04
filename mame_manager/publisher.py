@@ -33,11 +33,20 @@ class SyncManager:
             "rsync_backup_to_images_dry_run.txt",
             password=self._password_for(backup_url, self.cfg.images),
             delete=True,
+            delete_before=True,
         )
 
-    def _sync(self, src: Path | str, dst: Path | str, log_name: str, password: Path | None = None, delete: bool = True) -> None:
+    def _sync(
+        self,
+        src: Path | str,
+        dst: Path | str,
+        log_name: str,
+        password: Path | None = None,
+        delete: bool = True,
+        delete_before: bool = False,
+    ) -> None:
         dry_log = self.cfg.reports / log_name
-        dry_cmd = self._cmd(src, dst, dry=True, password=password, delete=delete)
+        dry_cmd = self._cmd(src, dst, dry=True, password=password, delete=delete, delete_before=delete_before)
         self.shell.run_to_log(dry_cmd, dry_log, check=True)
         changes = self._count_changes(dry_log)
         self.report.summary[log_name.replace(".txt", "_changes")] = changes
@@ -47,11 +56,21 @@ class SyncManager:
             answer = input(f"Apply rsync with {changes} changes to {dst}? [y/N] ")
             if answer.strip().lower() not in {"y", "yes"}:
                 raise FatalError("user declined rsync")
-        self.shell.run(self._cmd(src, dst, dry=False, password=password, delete=delete), check=True)
+        self.shell.run(self._cmd(src, dst, dry=False, password=password, delete=delete, delete_before=delete_before), check=True)
 
-    def _cmd(self, src: Path | str, dst: Path | str, dry: bool, password: Path | None, delete: bool) -> list[str | Path]:
+    def _cmd(
+        self,
+        src: Path | str,
+        dst: Path | str,
+        dry: bool,
+        password: Path | None,
+        delete: bool,
+        delete_before: bool = False,
+    ) -> list[str | Path]:
         cmd: list[str | Path] = [self.cfg.rsync_bin, "-av", "--itemize-changes", "--info=progress2"]
-        if delete:
+        if delete_before:
+            cmd.append("--delete-before")
+        elif delete:
             cmd.append("--delete")
         if dry:
             cmd.append("--dry-run")

@@ -9,6 +9,11 @@ from mame_manager.cli import parse_args
 
 def main() -> int:
     with TemporaryDirectory() as tmp:
+        empty_config = Path(tmp) / "missing.env"
+        default_cfg = parse_args(["--config", str(empty_config), "--scan-only"])
+        assert default_cfg.backup_url == defaults.DEFAULT_BACKUP_URL
+        assert default_cfg.rsync_pass == defaults.DEFAULT_RSYNC_PASSWORD_FILE
+
         config = Path(tmp) / "config.env"
         config.write_text(
             "\n".join(
