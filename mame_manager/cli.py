@@ -42,6 +42,11 @@ def parse_args(argv: list[str]) -> RunConfig:
     )
     parser.add_argument("--backup", action="store_true", help="also rsync images to the backup URL")
     parser.add_argument("--restore", action="store_true", help="rsync the backup URL back to images")
+    parser.add_argument(
+        "--check-broken",
+        action="store_true",
+        help="test archives and CHDs for corruption, resuming from the integrity cache",
+    )
     parser.add_argument("--merge-mode", choices=["merged", "split", "non-merged"], default=defaults.DEFAULT_MERGE_MODE)
     parser.add_argument(
         "--scan-jobs",
@@ -137,6 +142,17 @@ def parse_args(argv: list[str]) -> RunConfig:
         parser.error("--restore cannot be combined with scan or rebuild options")
     if args.restore and (args.backup or args.update_xml or args.download_missing or args.torrent_plan):
         parser.error("--restore cannot be combined with backup, XML update, torrent, or download actions")
+    if args.check_broken and (
+        args.scan_only
+        or args.rebuild
+        or args.rebuild_plan_only
+        or args.restore
+        or args.backup
+        or args.update_xml
+        or args.download_missing
+        or args.torrent_plan
+    ):
+        parser.error("--check-broken cannot be combined with scan, rebuild, restore, backup, XML, torrent, or download actions")
     if args.skip_xml and args.update_xml:
         parser.error("--skip-xml and --update-xml cannot be used together")
     if args.backup and not args.rebuild:
@@ -157,10 +173,11 @@ def parse_args(argv: list[str]) -> RunConfig:
         backup_url=args.backup_url,
         backup=args.backup,
         restore=args.restore,
+        check_broken=args.check_broken,
         merge_mode=args.merge_mode,
         scan_jobs=args.scan_jobs,
         compress_jobs=args.compress_jobs,
-        scan_only=not (args.rebuild or args.rebuild_plan_only or args.restore),
+        scan_only=not (args.rebuild or args.rebuild_plan_only or args.restore or args.check_broken),
         rebuild_plan_only=args.rebuild_plan_only,
         torrent_plan=args.torrent_plan,
         update_xml=args.update_xml,

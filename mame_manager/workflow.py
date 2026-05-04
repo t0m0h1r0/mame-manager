@@ -16,6 +16,7 @@ from .builder import Rebuilder
 from .reports import ReportManager
 from .runtime import Shell
 from .publisher import SyncManager
+from .integrity import IntegrityChecker
 from .torrents import QBittorrentDownloadManager, TorrentPlanner
 from .runtime import Validator
 
@@ -33,6 +34,12 @@ class MameRebuildApp:
             if self.cfg.restore:
                 self.report.phase("restore images")
                 SyncManager(self.cfg, self.shell, self.report).restore_images()
+                self.report.phase("done")
+                self.report.finish()
+                return 0
+            if self.cfg.check_broken:
+                self.report.phase("check broken files")
+                IntegrityChecker(self.cfg, self.shell, self.report).check_all()
                 self.report.phase("done")
                 self.report.finish()
                 return 0

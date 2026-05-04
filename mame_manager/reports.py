@@ -17,6 +17,7 @@ class ReportManager:
             "scan_only": cfg.scan_only,
             "rebuild_plan_only": cfg.rebuild_plan_only,
             "restore": cfg.restore,
+            "check_broken": cfg.check_broken,
             "merge_mode": cfg.merge_mode,
             "engine": "python-only",
             "notes": [],

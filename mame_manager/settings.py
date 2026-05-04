@@ -13,6 +13,7 @@ class RunConfig:
     backup_url: str | None
     backup: bool
     restore: bool
+    check_broken: bool
     merge_mode: str
     scan_jobs: int
     compress_jobs: int
@@ -71,6 +72,10 @@ class RunConfig:
     @property
     def chd_cache_file(self) -> Path:
         return self.work / "chd_cache.json"
+
+    @property
+    def integrity_cache_file(self) -> Path:
+        return self.work / "integrity_cache.json"
 
     @property
     def scan_cache_file(self) -> Path:

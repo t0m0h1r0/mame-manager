@@ -42,6 +42,7 @@ def main() -> int:
             scan_only=False,
             rebuild_plan_only=False,
             restore=False,
+            check_broken=False,
             merge_mode="merged",
             rsync_bin="rsync",
             rebuild_cache_file=root / "work" / "rebuild_cache.json",

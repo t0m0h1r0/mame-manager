@@ -16,6 +16,7 @@ hidden files and files under hidden directories are ignored.
 ./mame_manager.py --scan-jobs 8
 ./mame_manager.py --scan-only --scan-jobs 8
 ./mame_manager.py --update-xml --scan-only --scan-jobs 8
+./mame_manager.py --check-broken
 ./mame_manager.py --rebuild-plan-only --scan-jobs 8
 ./mame_manager.py --scan-only --torrent-plan torrent_file_list.txt
 QBITTORRENT_PASSWORD='password' ./mame_manager.py --scan-only --download-missing --qbittorrent-dry-run
@@ -71,6 +72,23 @@ In practice:
    `--rebuild`.
 5. Add `--backup` only when you want the rsync backup too.
 
+## Broken File Check
+
+Use `--check-broken` to test existing archive and CHD files without parsing DAT
+XML or rebuilding anything.
+
+```bash
+./mame_manager.py --check-broken
+```
+
+The checker runs `7z t` for ZIP/7z archives under `images/roms/`,
+`images/software_roms/`, and `Downloads/`.  CHDs under `images/chds/`,
+`images/software_chds/`, and `Downloads/` are verified with `chdman verify` when
+`chdman` is available.  Results are cached in `work_mame/integrity_cache.json`
+using path, size, mtime, and checker, so stopping midway and running the command
+again resumes from already verified files.  Broken files are written to
+`work_mame/reports/integrity_broken_files.txt`.
+
 ## qBittorrent Download Selection
 
 `mame_manager.py` can directly instruct an already-added qBittorrent torrent to
@@ -123,6 +141,7 @@ mame_manager/
   settings.py                    immutable runtime configuration
   catalog.py                     MAME XML/software-list extraction and parsing
   inventory.py                   input fingerprinting and archive indexing
+  integrity.py                   resumable archive/CHD corruption checks
   audit.py                       ROM completeness audit and set/file counts
   media.py                       CHD cache plus CHD/sample reporting/placement
   builder.py                     clean_images archive reuse and rebuild
@@ -173,3 +192,5 @@ Important files include:
 - `rebuild_unbuildable.txt`
 - `rebuild_skipped_no_incoming.txt`
 - `rsync_backup_to_images_dry_run.txt`
+- `integrity_broken_files.txt`
+- `integrity_skipped_files.txt`
