@@ -159,8 +159,8 @@ class Inventory:
         return self.by_crc_size.get(((expected.get("crc") or "").upper(), int(expected["size"])), [])
 
 
-def normalize_entries(entries: list[dict[str, Any]], name_key: str = "name") -> set[tuple[str, int, str]]:
-    return {(Path(e.get(name_key) or e.get("path") or "").name, int(e["size"]), (e.get("crc") or "").upper()) for e in entries}
+def normalize_entries(entries: list[dict[str, Any]], name_key: str = "name") -> set[tuple[int, str]]:
+    return {(int(e["size"]), (e.get("crc") or "").upper()) for e in entries}
 
 
 def archive_matches_target(rec: dict[str, Any], target: dict[str, Any]) -> bool:

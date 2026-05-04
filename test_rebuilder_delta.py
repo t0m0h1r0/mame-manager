@@ -37,6 +37,7 @@ def main() -> int:
             raw=root / "work" / "raw",
             reports=root / "work" / "reports",
             images=root / "images",
+            new=root / "Downloads",
             rebuild_mode="full",
             scan_only=False,
             rebuild_plan_only=False,
@@ -45,7 +46,10 @@ def main() -> int:
             rebuild_cache_file=root / "work" / "rebuild_cache.json",
         )
         (cfg.images / "roms").mkdir(parents=True)
+        cfg.new.mkdir(parents=True)
         (cfg.images / "roms" / "keep.7z").write_bytes(b"placeholder")
+        incoming = cfg.new / "partial.zip"
+        incoming.write_bytes(b"placeholder")
 
         targets = {
             "roms/keep.7z": {
@@ -54,11 +58,25 @@ def main() -> int:
             "roms/missing.7z": {
                 "entries": [{"name": "missing.bin", "size": 2, "crc": "22222222"}],
             },
+            "roms/partial.7z": {
+                "entries": [
+                    {"name": "have.bin", "size": 3, "crc": "33333333"},
+                    {"name": "need.bin", "size": 4, "crc": "44444444"},
+                ],
+            },
         }
         report = ReportManager(cfg)
+        inventory = Inventory(
+            {
+                str(incoming.resolve()): {
+                    "ok": True,
+                    "entries": [{"path": "have.bin", "name": "have.bin", "size": 3, "crc": "33333333"}],
+                }
+            }
+        )
         Rebuilder(cfg, SimpleNamespace(), report, FakeIndexer()).rebuild(
             FakeIndex(targets),
-            Inventory({}),
+            inventory,
             manifest_hash="manifest",
             input_fp="input",
             dat_hash="dat",
@@ -66,10 +84,13 @@ def main() -> int:
 
         assert not (cfg.clean / "roms" / "keep.7z").exists()
         assert not (cfg.clean / "roms" / "missing.7z").exists()
+        assert not (cfg.clean / "roms" / "partial.7z").exists()
         assert report.summary["unchanged_rom_packages"] == 1
         assert report.summary["rebuilt_rom_packages"] == 0
         assert report.summary["unbuildable_rom_packages"] == 1
-        assert "roms/missing.7z" in (cfg.reports / "rebuild_unbuildable.txt").read_text(encoding="utf-8")
+        assert report.summary["skipped_no_incoming_rom_packages"] == 1
+        assert "roms/partial.7z" in (cfg.reports / "rebuild_unbuildable.txt").read_text(encoding="utf-8")
+        assert "roms/missing.7z" in (cfg.reports / "rebuild_skipped_no_incoming.txt").read_text(encoding="utf-8")
 
         sync = SyncManager(cfg, SimpleNamespace(), report)
         patch_cmd = sync._cmd(cfg.clean, cfg.images, dry=True, password=None, delete=False)
@@ -88,12 +109,14 @@ def test_merged_archive_paths() -> None:
         "entries": [
             {"path": "parent.bin", "name": "parent.bin", "size": 1, "crc": "11111111"},
             {"path": "clone/rom.bin", "name": "rom.bin", "size": 2, "crc": "22222222"},
+            {"path": "clone/original-name.bin", "name": "original-name.bin", "size": 3, "crc": "33333333"},
         ],
     }
     target = {
         "entries": [
             {"name": "parent.bin", "size": 1, "crc": "11111111"},
             {"name": "rom.bin", "size": 2, "crc": "22222222"},
+            {"name": "renamed.bin", "size": 3, "crc": "33333333"},
         ],
     }
     assert archive_matches_target(rec, target)

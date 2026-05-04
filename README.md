@@ -26,8 +26,9 @@ QBITTORRENT_PASSWORD='password' ./mame_manager.py --scan-only --download-missing
 Current implementation supports `--merge-mode merged`.
 The default action is scan-only, and XML generation is not performed unless
 `--update-xml` is supplied.  Use `--rebuild` to build only changed ROM packages
-under `clean_images/` and sync that patch back to `images/`.  Add `--backup` to
-also rsync `images/` to the backup URL.
+that use incoming files from `Downloads/`, write them under `clean_images/`, and
+sync that patch back to `images/`.  Add `--backup` to also rsync `images/` to the
+backup URL.
 
 ## Standard Workflow
 
@@ -117,7 +118,7 @@ mame_manager/
 - `--rebuild` is required before rebuilding changed ROM packages or syncing to `images/`.
 - `--backup` is required before rsyncing `images/` to the backup URL.
 - `--qbittorrent-dry-run` inspects WebUI matches without changing torrent priorities.
-- Normal rebuilds write only changed files to `work_mame/clean_images/` first.
+- Normal rebuilds write only changed files with `Downloads/` sources to `work_mame/clean_images/` first.
 - `images/` updates go through `rsync --dry-run --itemize-changes` without `--delete`.
 - Large rsync changes are stopped unless `--force-large-sync` is used.
 
@@ -146,3 +147,4 @@ Important files include:
 - `qbittorrent_selected_files.txt`
 - `qbittorrent_unmatched_wanted_files.txt`
 - `rebuild_unbuildable.txt`
+- `rebuild_skipped_no_incoming.txt`

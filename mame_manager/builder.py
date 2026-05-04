@@ -37,9 +37,13 @@ class Rebuilder:
             return
         failures = []
         unbuildable = []
+        no_incoming = []
         for rel, target in sorted(index.all_targets().items()):
             if self._can_reuse_existing(rel, target):
                 self.unchanged += 1
+                continue
+            if not self._has_incoming_candidate(target, inventory):
+                no_incoming.append(rel)
                 continue
             missing_entries = self._missing_entries(target, inventory)
             if missing_entries:
@@ -49,7 +53,7 @@ class Rebuilder:
             ok, reason = self._build_target(rel, target, inventory)
             if not ok:
                 failures.append(f"{rel}: {reason}")
-        self._write_results(failures, unbuildable)
+        self._write_results(failures, unbuildable, no_incoming)
         if failures:
             raise FatalError(f"failed to build {len(failures)} ROM package(s); refusing to sync")
         atomic_write_json(
@@ -113,6 +117,20 @@ class Rebuilder:
             if not inventory.candidates(entry)
         ]
 
+    def _has_incoming_candidate(self, target: dict[str, Any], inventory: Inventory) -> bool:
+        for entry in target["entries"]:
+            for candidate in inventory.candidates(entry):
+                if self._is_incoming(Path(candidate["archive"])):
+                    return True
+        return False
+
+    def _is_incoming(self, path: Path) -> bool:
+        try:
+            path.resolve().relative_to(self.cfg.new.resolve())
+        except ValueError:
+            return False
+        return True
+
     def _existing_path(self, rel: str) -> Path:
         rel_path = Path(rel)
         if rel_path.parts[0] == "roms":
@@ -128,7 +146,7 @@ class Rebuilder:
             candidates = inventory.candidates(entry)
             if not candidates:
                 return False, f"missing {entry['name']} size={entry['size']} crc={entry['crc']}"
-            candidate = candidates[0]
+            candidate = self._best_candidate(candidates)
             if not self._extract_entry(candidate, staging, entry["name"]):
                 return False, f"failed to extract {entry['name']} from {candidate['archive']}"
             used.append(candidate["archive"])
@@ -147,12 +165,18 @@ class Rebuilder:
         self.created += 1
         return True, "ok"
 
-    def _write_results(self, failures: list[str], unbuildable: list[str]) -> None:
+    def _best_candidate(self, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        incoming = [c for c in candidates if self._is_incoming(Path(c["archive"]))]
+        return incoming[0] if incoming else candidates[0]
+
+    def _write_results(self, failures: list[str], unbuildable: list[str], no_incoming: list[str] | None = None) -> None:
         self.report.write("rebuild_failures.txt", failures)
         self.report.write("rebuild_unbuildable.txt", unbuildable)
+        self.report.write("rebuild_skipped_no_incoming.txt", no_incoming or [])
         self.report.summary["unchanged_rom_packages"] = self.unchanged
         self.report.summary["rebuilt_rom_packages"] = self.created
         self.report.summary["unbuildable_rom_packages"] = self.unbuildable
+        self.report.summary["skipped_no_incoming_rom_packages"] = len(no_incoming or [])
         self.report.summary["rebuild_failures"] = len(failures)
 
     def _extract_entry(self, candidate: dict[str, Any], staging: Path, out_name: str) -> bool:
