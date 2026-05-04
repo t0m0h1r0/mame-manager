@@ -141,7 +141,10 @@ mame_manager/
   settings.py                    immutable runtime configuration
   catalog.py                     MAME XML/software-list extraction and parsing
   inventory.py                   input fingerprinting and archive indexing
-  integrity.py                   resumable archive/CHD corruption checks
+  integrity.py                   resumable archive/CHD check orchestration
+  integrity_targets.py           archive/CHD target discovery
+  integrity_runner.py            per-file archive/CHD integrity commands
+  integrity_cache.py             resumable integrity result cache
   audit.py                       ROM completeness audit and set/file counts
   media.py                       CHD cache plus CHD/sample reporting/placement
   builder.py                     clean_images archive reuse and rebuild
