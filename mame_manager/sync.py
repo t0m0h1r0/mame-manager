@@ -3,10 +3,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .runtime import FatalError
-from .settings import RunConfig
-from .reports import ReportManager
-from .runtime import Shell
+from .system import FatalError
+from .config import RunConfig
+from .reporting import ReportManager
+from .system import Shell
 
 class SyncManager:
     def __init__(self, cfg: RunConfig, shell: Shell, report: ReportManager):

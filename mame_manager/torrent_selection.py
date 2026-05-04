@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .qbittorrent import (
+from .qbittorrent_client import (
     QBittorrentClient,
     QBittorrentConfig,
     QBittorrentError,
@@ -13,9 +13,9 @@ from .qbittorrent import (
     select_file_ids,
     torrent_display_name,
 )
-from .runtime import FatalError
-from .settings import RunConfig
-from .reports import ReportManager
+from .system import FatalError
+from .config import RunConfig
+from .reporting import ReportManager
 
 
 @dataclass(frozen=True)

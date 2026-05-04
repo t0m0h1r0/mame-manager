@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from .settings import RunConfig
-from .catalog import DatIndex
-from .inventory import Inventory
-from .reports import ReportManager
+from .config import RunConfig
+from .dat_catalog import DatIndex
+from .collection_index import Inventory
+from .reporting import ReportManager
 
 class Auditor:
     def __init__(self, cfg: RunConfig, report: ReportManager):

@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .runtime import VERSION, FatalError, atomic_write_json, load_json, now_iso, safe_rmtree
-from .settings import RunConfig
-from .catalog import DatIndex
-from .inventory import ArchiveIndexer, Inventory, archive_matches_target
-from .reports import ReportManager
-from .runtime import Shell
+from .system import VERSION, FatalError, atomic_write_json, load_json, now_iso, safe_rmtree
+from .config import RunConfig
+from .dat_catalog import DatIndex
+from .collection_index import ArchiveIndexer, Inventory, archive_matches_target
+from .reporting import ReportManager
+from .system import Shell
 
 class Rebuilder:
     def __init__(self, cfg: RunConfig, shell: Shell, report: ReportManager, indexer: ArchiveIndexer):

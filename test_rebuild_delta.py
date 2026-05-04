@@ -4,10 +4,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 
-from mame_manager.builder import Rebuilder
-from mame_manager.inventory import Inventory, archive_matches_target
-from mame_manager.publisher import SyncManager
-from mame_manager.reports import ReportManager
+from mame_manager.rebuilder import Rebuilder
+from mame_manager.collection_index import Inventory, archive_matches_target
+from mame_manager.sync import SyncManager
+from mame_manager.reporting import ReportManager
 
 
 class FakeIndex:

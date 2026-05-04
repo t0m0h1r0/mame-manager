@@ -3,12 +3,12 @@ from __future__ import annotations
 import concurrent.futures
 from typing import Any
 
-from .integrity_cache import IntegrityCache
-from .integrity_runner import IntegrityRunner
-from .integrity_targets import IntegrityTargetFinder
-from .reports import ReportManager
-from .runtime import Shell, now_iso
-from .settings import RunConfig
+from .cache import IntegrityCache
+from .runner import IntegrityRunner
+from .targets import IntegrityTargetFinder
+from ..config import RunConfig
+from ..reporting import ReportManager
+from ..system import Shell, now_iso
 
 
 SAVE_INTERVAL = 50

@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
-from .runtime import VERSION, now_iso
-from .settings import RunConfig
+from .system import VERSION, now_iso
+from .config import RunConfig
 
 class ReportManager:
     def __init__(self, cfg: RunConfig):

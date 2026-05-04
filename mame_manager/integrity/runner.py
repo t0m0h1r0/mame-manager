@@ -4,10 +4,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .integrity_cache import IntegrityCache
-from .integrity_targets import IntegrityTarget
-from .runtime import Shell, now_iso
-from .settings import RunConfig
+from .cache import IntegrityCache
+from .targets import IntegrityTarget
+from ..config import RunConfig
+from ..system import Shell, now_iso
 
 
 class IntegrityRunner:

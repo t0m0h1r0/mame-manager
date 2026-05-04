@@ -5,7 +5,7 @@ from dataclasses import fields
 from pathlib import Path
 
 from . import defaults
-from .settings import RunConfig
+from .config import RunConfig
 
 
 def parse_run_config(argv: list[str]) -> RunConfig:

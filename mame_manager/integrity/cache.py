@@ -5,8 +5,8 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from .integrity_targets import IntegrityTarget
-from .runtime import VERSION, atomic_write_json, load_json
+from .targets import IntegrityTarget
+from ..system import VERSION, atomic_write_json, load_json
 
 
 class IntegrityCache:

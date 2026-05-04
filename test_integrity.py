@@ -6,8 +6,8 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 from mame_manager.integrity import IntegrityChecker
-from mame_manager.reports import ReportManager
-from mame_manager.runtime import Shell
+from mame_manager.reporting import ReportManager
+from mame_manager.system import Shell
 
 
 def write_executable(path: Path, text: str) -> None:

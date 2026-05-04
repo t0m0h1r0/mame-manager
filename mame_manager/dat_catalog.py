@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from .runtime import VERSION, FatalError, parse_int, quote_cmd
-from .settings import RunConfig
-from .runtime import Shell
+from .system import VERSION, FatalError, parse_int, quote_cmd
+from .config import RunConfig
+from .system import Shell
 
 class DatExtractor:
     def __init__(self, cfg: RunConfig, shell: Shell):

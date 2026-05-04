@@ -136,24 +136,26 @@ mame_manager.py                  main audit/rebuild/qBittorrent CLI wrapper
 
 mame_manager/
   cli.py                         thin CLI entrypoint
-  arguments.py                   argument parsing and RunConfig construction
+  options.py                     argument parsing and RunConfig construction
+  config.py                      immutable runtime configuration
   defaults.py                    default paths, commands, env vars, and WebUI values
-  workflow.py                    top-level use case orchestration
-  settings.py                    immutable runtime configuration
-  catalog.py                     MAME XML/software-list extraction and parsing
-  inventory.py                   input fingerprinting and archive indexing
-  integrity.py                   resumable archive/CHD check orchestration
-  integrity_targets.py           archive/CHD target discovery
-  integrity_runner.py            per-file archive/CHD integrity commands
-  integrity_cache.py             resumable integrity result cache
-  audit.py                       ROM completeness audit and set/file counts
-  media.py                       CHD cache plus CHD/sample reporting/placement
-  builder.py                     clean_images archive reuse and rebuild
-  publisher.py                   guarded rsync publication
-  torrents.py                    wanted-file plan from missing/broken targets
-  qbittorrent.py                 qBittorrent Web API adapter and file matching
-  reports.py                     report and summary writing
-  runtime.py                     subprocess, hashing, JSON, and preflight tools
+  app.py                         top-level use case orchestration
+  system.py                      subprocess, hashing, JSON, and preflight tools
+  reporting.py                   report and summary writing
+  dat_catalog.py                 MAME XML/software-list extraction and parsing
+  collection_index.py            input fingerprinting and archive indexing
+  set_audit.py                   ROM completeness audit and set/file counts
+  assets.py                      CHD cache plus CHD/sample reporting/placement
+  rebuilder.py                   clean_images archive reuse and rebuild
+  sync.py                        guarded rsync publication
+  torrent_selection.py           wanted-file plan from missing/broken targets
+  qbittorrent_client.py          qBittorrent Web API adapter and file matching
+
+  integrity/
+    checker.py                   resumable archive/CHD check orchestration
+    targets.py                   archive/CHD target discovery
+    runner.py                    per-file archive/CHD integrity commands
+    cache.py                     resumable integrity result cache
 ```
 
 ## Safety

@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib import parse
 
 from mame_manager.defaults import DEFAULT_NEW_DIR
-from mame_manager.runtime import iter_visible_files
+from mame_manager.system import iter_visible_files
 
 
 REQUESTS: list[tuple[str, dict[str, list[str]]]] = []

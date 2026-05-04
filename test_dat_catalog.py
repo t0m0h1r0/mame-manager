@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from mame_manager.catalog import DatIndex
+from mame_manager.dat_catalog import DatIndex
 
 
 def write(path: Path, text: str) -> None:

@@ -7,7 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from .runtime import (
+from .system import (
     ARCHIVE_EXTS,
     SAMPLE_EXTS,
     VERSION,
@@ -17,9 +17,9 @@ from .runtime import (
     now_iso,
     sha256_bytes,
 )
-from .settings import RunConfig
-from .reports import ReportManager
-from .runtime import Shell
+from .config import RunConfig
+from .reporting import ReportManager
+from .system import Shell
 
 class Fingerprinter:
     def __init__(self, cfg: RunConfig):
