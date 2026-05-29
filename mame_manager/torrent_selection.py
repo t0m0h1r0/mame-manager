@@ -190,7 +190,9 @@ class TorrentPlanner:
             for norm, original in torrent_by_norm.items():
                 if norm == target_norm or norm.endswith("/" + target_norm):
                     matches.append(original)
-            return sorted(set(matches))
+            if matches:
+                return sorted(set(matches))
+            return sorted(set(torrent_by_basename.get(target_path.name, [])))
 
         stem = target_path.stem
         exts = [".zip", ".7z"]
