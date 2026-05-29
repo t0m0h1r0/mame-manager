@@ -81,17 +81,7 @@ class DatIndex:
                 elem.clear()
                 continue
             parent = elem.attrib.get("cloneof") or machine
-            entries = []
-            for rom in elem.findall("rom"):
-                if rom.attrib.get("status") == "nodump":
-                    continue
-                if self.merge_mode == "merged" and rom.attrib.get("merge"):
-                    continue
-                name = rom.attrib.get("name")
-                size = rom.attrib.get("size")
-                crc = rom.attrib.get("crc")
-                if name and size and crc:
-                    entries.append({"name": name, "size": parse_int(size), "crc": crc.upper(), "sha1": rom.attrib.get("sha1")})
+            entries = self._parse_rom_entries(elem.findall("rom"))
             if entries:
                 rel = f"roms/{parent}.7z" if self.merge_mode == "merged" else f"roms/{machine}.7z"
                 target = self.arcade_targets.setdefault(
@@ -125,17 +115,7 @@ class DatIndex:
                 if not sw_name:
                     continue
                 parent = software.attrib.get("cloneof") or sw_name
-                entries = []
-                for rom in software.findall(".//rom"):
-                    if rom.attrib.get("status") == "nodump":
-                        continue
-                    if self.merge_mode == "merged" and rom.attrib.get("merge"):
-                        continue
-                    name = rom.attrib.get("name")
-                    size = rom.attrib.get("size")
-                    crc = rom.attrib.get("crc")
-                    if name and size and crc:
-                        entries.append({"name": name, "size": parse_int(size), "crc": crc.upper(), "sha1": rom.attrib.get("sha1")})
+                entries = self._parse_rom_entries(software.findall(".//rom"))
                 if entries:
                     rel_name = parent if self.merge_mode == "merged" else sw_name
                     rel = f"software_roms/{list_name}/{rel_name}.7z"
@@ -157,6 +137,32 @@ class DatIndex:
                         self.software_chds.append(
                             {"softwarelist": list_name, "software": sw_name, "disk": name, "sha1": sha1.lower()}
                         )
+
+    def _parse_rom_entries(self, roms: list[ET.Element]) -> list[dict[str, Any]]:
+        entries = []
+        current_file: dict[str, Any] | None = None
+        for rom in roms:
+            if rom.attrib.get("status") == "nodump":
+                current_file = None
+                continue
+            loadflag = rom.attrib.get("loadflag")
+            size = rom.attrib.get("size")
+            if loadflag in {"continue", "ignore"}:
+                if current_file is not None and size:
+                    current_file["size"] += parse_int(size)
+                continue
+            if self.merge_mode == "merged" and rom.attrib.get("merge"):
+                current_file = None
+                continue
+            name = rom.attrib.get("name")
+            crc = rom.attrib.get("crc")
+            if name and size and crc:
+                current_file = {"name": name, "size": parse_int(size), "crc": crc.upper(), "sha1": rom.attrib.get("sha1")}
+                entries.append(current_file)
+                continue
+            if loadflag != "reload":
+                current_file = None
+        return entries
 
     @staticmethod
     def _add_unique_entries(dst: list[dict[str, Any]], src: list[dict[str, Any]]) -> None:
