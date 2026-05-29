@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -142,19 +143,22 @@ class Rebuilder:
         safe_rmtree(staging, self.cfg.work)
         staging.mkdir(parents=True, exist_ok=True)
         used = []
+        duplicate_names = self._duplicate_entry_names(target)
+        used_paths: set[str] = set()
         for entry in target["entries"]:
             candidates = inventory.candidates(entry)
             if not candidates:
                 return False, f"missing {entry['name']} size={entry['size']} crc={entry['crc']}"
             candidate = self._best_candidate(candidates)
-            if not self._extract_entry(candidate, staging, entry["name"]):
+            out_path = self._staging_relpath(entry["name"], candidate["path"], duplicate_names, used_paths)
+            if not self._extract_entry(candidate, staging, out_path):
                 return False, f"failed to extract {entry['name']} from {candidate['archive']}"
             used.append(candidate["archive"])
         dst = self.cfg.clean / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         tmp = dst.with_suffix(".7z.tmp")
         tmp.unlink(missing_ok=True)
-        names = sorted(p.name for p in staging.iterdir() if p.is_file())
+        names = sorted(str(p.relative_to(staging)) for p in staging.rglob("*") if p.is_file())
         if not names:
             return False, "no staged files"
         self.shell.run([self.cfg.sevenz_bin, "a", "-t7z", "-mx=9", "-mmt=1", tmp.resolve(), *names], cwd=staging)
@@ -179,7 +183,43 @@ class Rebuilder:
         self.report.summary["skipped_no_incoming_rom_packages"] = len(no_incoming or [])
         self.report.summary["rebuild_failures"] = len(failures)
 
-    def _extract_entry(self, candidate: dict[str, Any], staging: Path, out_name: str) -> bool:
+    @staticmethod
+    def _duplicate_entry_names(target: dict[str, Any]) -> set[str]:
+        counts = Counter(Path(entry["name"]).name for entry in target["entries"])
+        return {name for name, count in counts.items() if count > 1}
+
+    @classmethod
+    def _staging_relpath(
+        cls,
+        out_name: str,
+        candidate_path: str,
+        duplicate_names: set[str],
+        used_paths: set[str],
+    ) -> Path:
+        base_name = Path(out_name).name
+        source = candidate_path if base_name in duplicate_names else out_name
+        rel = cls._safe_relative_path(source)
+        if rel.as_posix() not in used_paths:
+            used_paths.add(rel.as_posix())
+            return rel
+        for i in range(2, 1000000):
+            alt = Path(f"__dup{i}") / rel.name
+            if alt.as_posix() not in used_paths:
+                used_paths.add(alt.as_posix())
+                return alt
+        raise FatalError(f"unable to allocate unique staging path for {out_name}")
+
+    @staticmethod
+    def _safe_relative_path(value: str | Path) -> Path:
+        path = Path(value)
+        parts = []
+        for part in path.parts:
+            if part in {"", ".", "..", path.anchor}:
+                continue
+            parts.append(part)
+        return Path(*parts) if parts else Path(path.name)
+
+    def _extract_entry(self, candidate: dict[str, Any], staging: Path, out_name: str | Path) -> bool:
         archive = Path(candidate["archive"])
         entry_path = candidate["path"]
         tmpdir = staging / ".extract_tmp"
@@ -194,7 +234,8 @@ class Rebuilder:
             if len(files) != 1:
                 return False
             extracted = files[0]
-        dst = staging / Path(out_name).name
+        dst = staging / self._safe_relative_path(out_name)
+        dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists():
             dst.unlink()
         extracted.replace(dst)

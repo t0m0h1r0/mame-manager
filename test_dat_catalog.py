@@ -27,6 +27,11 @@ def main() -> int:
     <rom name="bios.bin" merge="bios.bin" size="1" crc="11111111" />
     <rom name="game.bin" size="4" crc="44444444" />
   </machine>
+  <machine name="continued">
+    <rom name="continued.bin" size="2" crc="77777777" />
+    <rom size="3" loadflag="continue" />
+    <rom size="4" loadflag="reload" />
+  </machine>
 </mame>
 """
     software = """<?xml version="1.0"?>
@@ -47,6 +52,15 @@ def main() -> int:
         </dataarea>
       </part>
     </software>
+    <software name="continued">
+      <part name="p" interface="cart">
+        <dataarea name="rom" size="9">
+          <rom name="continued.bin" size="2" crc="7777777" />
+          <rom size="3" loadflag="continue" />
+          <rom size="4" loadflag="reload" />
+        </dataarea>
+      </part>
+    </software>
   </softwarelist>
 </softwarelists>
 """
@@ -59,13 +73,16 @@ def main() -> int:
 
         index = DatIndex(arcade_xml, software_xml, "merged").parse()
 
-    assert sorted(index.arcade_targets) == ["roms/bios.7z", "roms/biosgame.7z", "roms/parent.7z"]
+    assert sorted(index.arcade_targets) == ["roms/bios.7z", "roms/biosgame.7z", "roms/continued.7z", "roms/parent.7z"]
     assert names(index.arcade_targets["roms/bios.7z"]) == ["bios.bin"]
     assert names(index.arcade_targets["roms/parent.7z"]) == ["parent.bin", "clone.bin"]
     assert names(index.arcade_targets["roms/biosgame.7z"]) == ["game.bin"]
+    assert entry_size(index.arcade_targets["roms/continued.7z"], "continued.bin") == 5
 
-    assert sorted(index.software_targets) == ["software_roms/list/cart.7z"]
+    assert sorted(index.software_targets) == ["software_roms/list/cart.7z", "software_roms/list/continued.7z"]
     assert names(index.software_targets["software_roms/list/cart.7z"]) == ["cart.bin", "cartclone.bin"]
+    assert entry_size(index.software_targets["software_roms/list/continued.7z"], "continued.bin") == 5
+    assert entry_crc(index.software_targets["software_roms/list/continued.7z"], "continued.bin") == "07777777"
 
     print("catalog merged inheritance tests passed")
     return 0
@@ -73,6 +90,20 @@ def main() -> int:
 
 def names(target: dict[str, object]) -> list[str]:
     return [entry["name"] for entry in target["entries"]]  # type: ignore[index]
+
+
+def entry_size(target: dict[str, object], name: str) -> int:
+    for entry in target["entries"]:  # type: ignore[index]
+        if entry["name"] == name:
+            return int(entry["size"])
+    raise AssertionError(f"missing entry: {name}")
+
+
+def entry_crc(target: dict[str, object], name: str) -> str:
+    for entry in target["entries"]:  # type: ignore[index]
+        if entry["name"] == name:
+            return str(entry["crc"])
+    raise AssertionError(f"missing entry: {name}")
 
 
 if __name__ == "__main__":
