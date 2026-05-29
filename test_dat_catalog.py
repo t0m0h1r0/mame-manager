@@ -27,10 +27,16 @@ def main() -> int:
     <rom name="bios.bin" merge="bios.bin" size="1" crc="11111111" />
     <rom name="game.bin" size="4" crc="44444444" />
   </machine>
-  <machine name="continued">
+  <machine name="continued" sampleof="sampleparent">
     <rom name="continued.bin" size="2" crc="77777777" />
     <rom size="3" loadflag="continue" />
     <rom size="4" loadflag="reload" />
+    <sample name="boom"/>
+    <sample name="clang"/>
+  </machine>
+  <machine name="continuedclone" cloneof="continued" sampleof="sampleparent">
+    <sample name="boom"/>
+    <sample name="whirr"/>
   </machine>
 </mame>
 """
@@ -83,6 +89,9 @@ def main() -> int:
     assert names(index.software_targets["software_roms/list/cart.7z"]) == ["cart.bin", "cartclone.bin"]
     assert entry_size(index.software_targets["software_roms/list/continued.7z"], "continued.bin") == 5
     assert entry_crc(index.software_targets["software_roms/list/continued.7z"], "continued.bin") == "07777777"
+    assert sorted(index.sample_targets) == ["samples/sampleparent"]
+    assert names(index.sample_targets["samples/sampleparent"]) == ["boom", "clang", "whirr"]
+    assert index.sample_targets["samples/sampleparent"]["machines"] == ["continued", "continuedclone"]
 
     print("catalog merged inheritance tests passed")
     return 0

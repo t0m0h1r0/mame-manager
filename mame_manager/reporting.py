@@ -55,6 +55,8 @@ class ReportManager:
         self._print_json_summary("rom_file_entries")
         self._print_json_summary("missing_rom_entries")
         self._print_json_summary("missing_chds")
+        self._print_json_summary("sample_sets")
+        self._print_json_summary("sample_file_entries")
         self._print_plain_summary("missing_samples")
         self._print_plain_summary("archive_errors")
         self._print_json_summary("qbittorrent")

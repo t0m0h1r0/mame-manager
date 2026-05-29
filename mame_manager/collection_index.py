@@ -34,7 +34,7 @@ class Fingerprinter:
             (self.cfg.images / "chds", "arcade_chd", {".chd"}),
             (self.cfg.images / "software_chds", "software_chd", {".chd"}),
             (self.cfg.new, "new_chd", {".chd"}),
-            (self.cfg.images / "samples", "sample", SAMPLE_EXTS),
+            (self.cfg.images / "samples", "sample", ARCHIVE_EXTS | SAMPLE_EXTS),
             (self.cfg.new, "new_sample", SAMPLE_EXTS),
         ]
         for root, kind, exts in roots:

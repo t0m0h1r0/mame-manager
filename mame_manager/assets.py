@@ -5,8 +5,10 @@ import os
 import re
 import shutil
 from pathlib import Path
+from typing import Any
 
-from .system import SAMPLE_EXTS, VERSION, atomic_write_json, iter_visible_files, load_json, now_iso, sha1_file
+from .collection_index import ArchiveIndexer
+from .system import ARCHIVE_EXTS, SAMPLE_EXTS, VERSION, atomic_write_json, iter_visible_files, load_json, now_iso, sha1_file
 from .config import RunConfig
 from .dat_catalog import DatIndex
 from .reporting import ReportManager
@@ -127,24 +129,106 @@ class AssetManager:
                     found[path.stem] = path
         return found
 
-    def report_samples(self, samples: set[str]) -> None:
-        found = self.sample_sources()
-        missing = sorted(samples - set(found))
-        self.report.write("missing_samples.txt", missing)
-        self.report.summary["missing_samples"] = len(missing)
+    def report_samples(self, index: DatIndex, indexer: ArchiveIndexer) -> None:
+        status = self._sample_status(index, indexer)
+        self._write_sample_reports(status)
 
-    def place_samples(self, samples: set[str]) -> None:
-        found = self.sample_sources()
-        missing = sorted(samples - set(found))
-        for name in sorted(samples & set(found)):
-            src = found[name]
+    def place_samples(self, index: DatIndex, indexer: ArchiveIndexer) -> None:
+        status = self._sample_status(index, indexer)
+        for src in status["complete_sources"].values():
             if not self._is_incoming(src):
                 continue
             dst = self.cfg.clean / "samples" / src.name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
-        self.report.write("missing_samples.txt", missing)
-        self.report.summary["missing_samples"] = len(missing)
+        self._write_sample_reports(status)
+
+    def _sample_status(self, index: DatIndex, indexer: ArchiveIndexer) -> dict[str, Any]:
+        candidates = self._sample_candidates({target["sample_set"] for target in index.sample_targets.values()})
+        complete_sets = []
+        incomplete_sets = []
+        missing_entries = []
+        complete_sources: dict[str, Path] = {}
+        archive_errors = []
+        present_total = 0
+        total = 0
+
+        for rel, target in sorted(index.sample_targets.items()):
+            wanted = {entry["name"] for entry in target["entries"]}
+            total += len(wanted)
+            present: set[str] = set()
+            for path in candidates.get(target["sample_set"], []):
+                names, error = self._sample_names_in_source(path, indexer)
+                if error:
+                    archive_errors.append(error)
+                present.update(wanted & names)
+                if wanted.issubset(names) and rel not in complete_sources:
+                    complete_sources[rel] = path
+            present_total += len(present)
+            missing = sorted(wanted - present)
+            if missing:
+                incomplete_sets.append(f"{rel}: missing {len(missing)}/{len(wanted)}")
+                missing_entries.extend(f"{rel}: {name}" for name in missing)
+            else:
+                complete_sets.append(rel)
+
+        return {
+            "complete_sets": complete_sets,
+            "incomplete_sets": incomplete_sets,
+            "missing_entries": missing_entries,
+            "complete_sources": complete_sources,
+            "archive_errors": sorted(set(archive_errors)),
+            "present_entries": present_total,
+            "total_entries": total,
+        }
+
+    def _sample_candidates(self, wanted_sets: set[str]) -> dict[str, list[Path]]:
+        candidates: dict[str, list[Path]] = {name: [] for name in wanted_sets}
+        for root in (self.cfg.images / "samples", self.cfg.new):
+            for path in iter_visible_files(root):
+                if path.is_file() and path.suffix.lower() in ARCHIVE_EXTS | SAMPLE_EXTS and path.stem in wanted_sets:
+                    candidates[path.stem].append(path)
+        for paths in candidates.values():
+            paths.sort(key=lambda path: (0 if self._is_existing_sample(path) else 1, str(path)))
+        return candidates
+
+    def _sample_names_in_source(self, path: Path, indexer: ArchiveIndexer) -> tuple[set[str], str | None]:
+        if path.suffix.lower() in SAMPLE_EXTS:
+            return {path.stem}, None
+        rec = indexer.index_one(path)
+        if not rec.get("ok"):
+            return set(), f"{path}: {rec.get('error') or '7z failed'}"
+        names = {
+            Path(entry.get("path") or entry.get("name") or "").stem
+            for entry in rec.get("entries", [])
+            if Path(entry.get("path") or entry.get("name") or "").suffix.lower() in SAMPLE_EXTS
+        }
+        return names, None
+
+    def _write_sample_reports(self, status: dict[str, Any]) -> None:
+        self.report.write("sample_complete_sets.txt", status["complete_sets"])
+        self.report.write("sample_incomplete_sets.txt", status["incomplete_sets"])
+        self.report.write("sample_missing_entries.txt", status["missing_entries"])
+        self.report.write("missing_samples.txt", status["missing_entries"])
+        self.report.write("sample_archive_errors.txt", status["archive_errors"])
+        self.report.summary["sample_sets"] = {
+            "complete": len(status["complete_sets"]),
+            "incomplete": len(status["incomplete_sets"]),
+            "total": len(status["complete_sets"]) + len(status["incomplete_sets"]),
+        }
+        self.report.summary["sample_file_entries"] = {
+            "missing": len(status["missing_entries"]),
+            "present": status["present_entries"],
+            "total": status["total_entries"],
+        }
+        self.report.summary["missing_samples"] = len(status["missing_entries"])
+
+    def _is_existing_sample(self, path: Path) -> bool:
+        try:
+            path.resolve().relative_to((self.cfg.images / "samples").resolve())
+        except ValueError:
+            return False
+        return True
 
     def _is_incoming(self, path: Path) -> bool:
         try:
