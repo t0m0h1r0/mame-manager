@@ -49,10 +49,20 @@ class TorrentPlanner:
         self.cfg = cfg
         self.report = report
 
-    def plan(self, missing_roms: dict[str, list[str]], archive_errors: list[str]) -> TorrentPlan | None:
+    def plan(
+        self,
+        missing_roms: dict[str, list[str]],
+        archive_errors: list[str],
+        missing_chds: dict[str, list[str]] | None = None,
+    ) -> TorrentPlan | None:
         if not self.cfg.torrent_plan:
             return None
-        plan = self.plan_from_file_list(self._read_torrent_file_list(self.cfg.torrent_plan), missing_roms, archive_errors)
+        plan = self.plan_from_file_list(
+            self._read_torrent_file_list(self.cfg.torrent_plan),
+            missing_roms,
+            archive_errors,
+            missing_chds,
+        )
         self.write_plan(plan)
         return plan
 
@@ -61,6 +71,7 @@ class TorrentPlanner:
         torrent_files: list[str],
         missing_roms: dict[str, list[str]],
         archive_errors: list[str],
+        missing_chds: dict[str, list[str]] | None = None,
     ) -> TorrentPlan:
         torrent_by_basename = defaultdict(list)
         torrent_by_norm = {}
@@ -69,7 +80,7 @@ class TorrentPlanner:
             torrent_by_norm[norm] = item
             torrent_by_basename[Path(norm).name].append(item)
 
-        targets = self._missing_targets(missing_roms)
+        targets = self._missing_targets(missing_roms, missing_chds)
         broken_names = self._broken_archive_names(archive_errors)
         wanted = []
         unmatched = []
@@ -136,14 +147,26 @@ class TorrentPlanner:
         return path.strip().replace("\\", "/").lstrip("./")
 
     @staticmethod
-    def _missing_targets(missing_roms: dict[str, list[str]]) -> set[str]:
+    def _missing_targets(
+        missing_roms: dict[str, list[str]],
+        missing_chds: dict[str, list[str]] | None = None,
+    ) -> set[str]:
         targets = set()
         for rows in missing_roms.values():
             for row in rows:
-                target = row.split(":", 1)[0].strip()
+                target = TorrentPlanner._target_from_row(row)
+                if target:
+                    targets.add(target)
+        for rows in (missing_chds or {}).values():
+            for row in rows:
+                target = TorrentPlanner._target_from_row(row)
                 if target:
                     targets.add(target)
         return targets
+
+    @staticmethod
+    def _target_from_row(row: str) -> str:
+        return row.split(":", 1)[0].split(" sha1=", 1)[0].strip()
 
     @staticmethod
     def _broken_archive_names(archive_errors: list[str]) -> set[str]:
@@ -162,6 +185,15 @@ class TorrentPlanner:
     ) -> list[str]:
         target_norm = self._norm(target)
         target_path = Path(target_norm)
+        if target_path.suffix.lower() == ".chd":
+            matches = []
+            for norm, original in torrent_by_norm.items():
+                if norm == target_norm or norm.endswith("/" + target_norm):
+                    matches.append(original)
+            if matches:
+                return sorted(set(matches))
+            return sorted(set(torrent_by_basename.get(target_path.name, [])))
+
         stem = target_path.stem
         exts = [".zip", ".7z"]
         candidate_suffixes = []
@@ -189,11 +221,16 @@ class QBittorrentDownloadManager:
         self.report = report
         self.planner = TorrentPlanner(cfg, report)
 
-    def apply(self, missing_roms: dict[str, list[str]], archive_errors: list[str]) -> None:
+    def apply(
+        self,
+        missing_roms: dict[str, list[str]],
+        archive_errors: list[str],
+        missing_chds: dict[str, list[str]] | None = None,
+    ) -> None:
         if not self.cfg.qbittorrent_enabled:
             return
-        if not any(missing_roms.values()) and not archive_errors:
-            self.report.note("qBittorrent skipped: no missing ROM targets or broken archives")
+        if not any(missing_roms.values()) and not any((missing_chds or {}).values()) and not archive_errors:
+            self.report.note("qBittorrent skipped: no missing ROM/CHD targets or broken archives")
             self.report.summary["qbittorrent"] = {"wanted_files": 0, "selected_files": 0, "dry_run": self.cfg.qbittorrent_dry_run}
             return
         assert self.cfg.qbittorrent_url is not None
@@ -208,7 +245,7 @@ class QBittorrentDownloadManager:
         )
         try:
             client.login()
-            torrent_plans = self._matching_torrent_plans(client, missing_roms, archive_errors)
+            torrent_plans = self._matching_torrent_plans(client, missing_roms, archive_errors, missing_chds)
             combined_plan = self._combine_plans([item.plan for item in torrent_plans])
             self.planner.write_plan(combined_plan)
 
@@ -278,10 +315,11 @@ class QBittorrentDownloadManager:
         client: QBittorrentClient,
         missing_roms: dict[str, list[str]],
         archive_errors: list[str],
+        missing_chds: dict[str, list[str]] | None = None,
     ) -> list[QBittorrentTorrentPlan]:
         if self.cfg.qbittorrent_hash:
             files = client.torrent_files(self.cfg.qbittorrent_hash)
-            plan = self._plan_for_files(files, missing_roms, archive_errors)
+            plan = self._plan_for_files(files, missing_roms, archive_errors, missing_chds)
             if not plan.download_files():
                 raise FatalError("specified qBittorrent torrent contains no missing or broken targets")
             return [
@@ -306,7 +344,7 @@ class QBittorrentDownloadManager:
             if not torrent_hash:
                 continue
             files = client.torrent_files(str(torrent_hash))
-            plan = self._plan_for_files(files, missing_roms, archive_errors)
+            plan = self._plan_for_files(files, missing_roms, archive_errors, missing_chds)
             if not plan.download_files():
                 continue
             matched.append(
@@ -327,9 +365,10 @@ class QBittorrentDownloadManager:
         files: list[dict[str, Any]],
         missing_roms: dict[str, list[str]],
         archive_errors: list[str],
+        missing_chds: dict[str, list[str]] | None = None,
     ) -> TorrentPlan:
         names = [str(file_info.get("name", "")) for file_info in files]
-        return self.planner.plan_from_file_list(names, missing_roms, archive_errors)
+        return self.planner.plan_from_file_list(names, missing_roms, archive_errors, missing_chds)
 
     @staticmethod
     def _combine_plans(plans: list[TorrentPlan]) -> TorrentPlan:

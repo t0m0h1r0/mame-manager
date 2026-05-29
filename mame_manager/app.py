@@ -56,7 +56,7 @@ class MameRebuildApp:
                 "software_roms": len(index.software_targets),
                 "arcade_chds": len(index.arcade_chds),
                 "software_chds": len(index.software_chds),
-                "samples": len(index.samples),
+                "sample_sets": len(index.sample_targets),
             }
             if not self.cfg.scan_only:
                 atomic_write_json(self.cfg.target_manifest_file, manifest)
@@ -70,25 +70,26 @@ class MameRebuildApp:
             inventory = Inventory(archives)
             self.report.phase("audit ROMs")
             missing_roms = Auditor(self.cfg, self.report).audit_roms(index, inventory)
-            if self.cfg.torrent_plan:
-                self.report.phase("plan torrent files")
-                TorrentPlanner(self.cfg, self.report).plan(missing_roms, inventory.bad_archives)
-            if self.cfg.qbittorrent_enabled:
-                self.report.phase("apply qBittorrent file priorities")
-                QBittorrentDownloadManager(self.cfg, self.report).apply(missing_roms, inventory.bad_archives)
             self.report.phase("scan CHDs")
             chds = ChdCache(self.cfg, self.shell, self.report).scan()
             assets = AssetManager(self.cfg, self.report)
+            missing_chds = assets.missing_chds(index, chds)
+            if self.cfg.torrent_plan:
+                self.report.phase("plan torrent files")
+                TorrentPlanner(self.cfg, self.report).plan(missing_roms, inventory.bad_archives, missing_chds)
+            if self.cfg.qbittorrent_enabled:
+                self.report.phase("apply qBittorrent file priorities")
+                QBittorrentDownloadManager(self.cfg, self.report).apply(missing_roms, inventory.bad_archives, missing_chds)
             if self.cfg.scan_only:
                 assets.report_chds(index, chds)
-                assets.report_samples(index.samples)
+                assets.report_samples(index, indexer)
                 self.report.print_scan_summary()
                 self._write_scan_cache(dat_hash, fp["sha256"], manifest_hash)
             elif self.cfg.rebuild_plan_only:
                 self.report.phase("plan rebuild")
                 Rebuilder(self.cfg, self.shell, self.report, indexer).plan(index, inventory)
                 assets.report_chds(index, chds)
-                assets.report_samples(index.samples)
+                assets.report_samples(index, indexer)
                 self.report.print_scan_summary()
             else:
                 if inventory.bad_archives:
@@ -96,7 +97,7 @@ class MameRebuildApp:
                 self.report.phase("rebuild clean_images")
                 Rebuilder(self.cfg, self.shell, self.report, indexer).rebuild(index, inventory, manifest_hash, fp["sha256"], dat_hash)
                 assets.place_chds(index, chds)
-                assets.place_samples(index.samples)
+                assets.place_samples(index, indexer)
                 self.report.phase("rsync")
                 SyncManager(self.cfg, self.shell, self.report).sync_all()
             self.report.phase("done")

@@ -65,6 +65,7 @@ class DatIndex:
         self.software_targets: dict[str, dict[str, Any]] = {}
         self.arcade_chds: list[dict[str, str]] = []
         self.software_chds: list[dict[str, str]] = []
+        self.sample_targets: dict[str, dict[str, Any]] = {}
         self.samples: set[str] = set()
 
     def parse(self) -> "DatIndex":
@@ -101,6 +102,15 @@ class DatIndex:
                 name = sample.attrib.get("name")
                 if name:
                     self.samples.add(name)
+                    sample_set = elem.attrib.get("sampleof") or machine
+                    rel = f"samples/{sample_set}"
+                    target = self.sample_targets.setdefault(
+                        rel,
+                        {"kind": "sample", "sample_set": sample_set, "machines": [], "entries": []},
+                    )
+                    if machine not in target["machines"]:
+                        target["machines"].append(machine)
+                    self._add_unique_sample_entries(target["entries"], [{"name": name}])
             elem.clear()
 
     def _parse_software(self) -> None:
@@ -174,12 +184,22 @@ class DatIndex:
             dst.append(entry)
             seen.add(key)
 
+    @staticmethod
+    def _add_unique_sample_entries(dst: list[dict[str, Any]], src: list[dict[str, Any]]) -> None:
+        seen = {e["name"] for e in dst}
+        for entry in src:
+            if entry["name"] in seen:
+                continue
+            dst.append(entry)
+            seen.add(entry["name"])
+
     def manifest(self) -> dict[str, Any]:
         return {
             "version": VERSION,
             "merge_mode": self.merge_mode,
             "arcade": self.arcade_targets,
             "software": self.software_targets,
+            "samples": self.sample_targets,
         }
 
     def all_targets(self) -> dict[str, dict[str, Any]]:

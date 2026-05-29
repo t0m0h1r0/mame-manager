@@ -17,6 +17,7 @@ from mame_manager.system import iter_visible_files
 REQUESTS: list[tuple[str, dict[str, list[str]]]] = []
 TORRENTS = [
     {"hash": "bad111", "name": "Other torrent"},
+    {"hash": "chd789", "name": "MAME 0.287 CHDs (merged)"},
     {"hash": "abc123", "name": "MAME 0.287 ROMs (merged)"},
     {"hash": "def456", "name": "MAME 0.287 ROMs update pack"},
 ]
@@ -62,6 +63,13 @@ class Handler(BaseHTTPRequestHandler):
                     {"name": "MAME 0.287 ROMs update pack/missing.zip"},
                     {"name": "MAME 0.287 ROMs update pack/other.zip"},
                 ]
+            elif torrent_hash == "chd789":
+                payload = [
+                    {"name": "MAME 0.287 CHDs (merged)/kinst/kinst.chd"},
+                    {"name": "MAME 0.287 CHDs (merged)/kinst2/kinst.chd"},
+                    {"name": "MAME 0.287 Software List CHDs (merged)/fmtowns_cd/game/disk.chd"},
+                    {"name": "MAME 0.287 Software List CHDs (merged)/other/game/disk.chd"},
+                ]
             else:
                 payload = [{"name": "other.zip"}]
             data = json.dumps(payload).encode()
@@ -99,11 +107,27 @@ def write_fixture(root: Path) -> tuple[Path, Path, Path, Path]:
   <machine name="100in1rg"><rom name="a.bin" size="1" crc="11111111"/></machine>
   <machine name="bloodstm"><rom name="b.bin" size="1" crc="22222222"/></machine>
   <machine name="missing"><rom name="c.bin" size="1" crc="33333333"/></machine>
+  <machine name="kinst"><disk name="kinst" sha1="1111111111111111111111111111111111111111"/></machine>
 </mame>
 """,
         encoding="utf-8",
     )
-    (work / "software.xml").write_text("<softwarelists/>\n", encoding="utf-8")
+    (work / "software.xml").write_text(
+        """<?xml version="1.0"?>
+<softwarelists>
+  <softwarelist name="fmtowns_cd">
+    <software name="game">
+      <part name="cdrom" interface="fmtowns_cdrom">
+        <diskarea name="cdrom">
+          <disk name="disk" sha1="2222222222222222222222222222222222222222"/>
+        </diskarea>
+      </part>
+    </software>
+  </softwarelist>
+</softwarelists>
+""",
+        encoding="utf-8",
+    )
     sevenz = root / "7z"
     sevenz.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     sevenz.chmod(0o755)
@@ -184,6 +208,8 @@ def main() -> int:
 
         REQUESTS.clear()
         auto = run_manager(root / "auto", url, "--qbittorrent-name", "MAME", "--qbittorrent-dry-run")
+        assert "qBittorrent torrent: MAME 0.287 CHDs (merged) (chd789)" in auto.stdout
+        assert "qBittorrent selected files: 2/4" in auto.stdout
         assert "qBittorrent torrent: MAME 0.287 ROMs (merged) (abc123)" in auto.stdout
         assert "qBittorrent selected files: 2/3" in auto.stdout
         assert "qBittorrent torrent: MAME 0.287 ROMs update pack (def456)" in auto.stdout
@@ -191,24 +217,20 @@ def main() -> int:
 
         REQUESTS.clear()
         all_torrents = run_manager(root / "all", url, "--qbittorrent-name", "MAME", "--qbittorrent-resume")
+        assert "qBittorrent selected files: 2/4" in all_torrents.stdout
         assert "qBittorrent selected files: 2/3" in all_torrents.stdout
         assert "qBittorrent selected files: 1/2" in all_torrents.stdout
         file_prio = [(path, fields) for path, fields in REQUESTS if path == "/api/v2/torrents/filePrio"]
-        assert len(file_prio) == 4, REQUESTS
-        assert file_prio[0][1]["hash"] == ["abc123"]
-        assert file_prio[0][1]["id"] == ["0|1|2"]
-        assert file_prio[0][1]["priority"] == ["0"]
-        assert file_prio[1][1]["hash"] == ["abc123"]
-        assert file_prio[1][1]["id"] == ["0|1"]
-        assert file_prio[1][1]["priority"] == ["1"]
-        assert file_prio[2][1]["hash"] == ["def456"]
-        assert file_prio[2][1]["id"] == ["0|1"]
-        assert file_prio[2][1]["priority"] == ["0"]
-        assert file_prio[3][1]["hash"] == ["def456"]
-        assert file_prio[3][1]["id"] == ["0"]
-        assert file_prio[3][1]["priority"] == ["1"]
+        assert len(file_prio) == 6, REQUESTS
+        by_hash_priority = {(fields["hash"][0], fields["priority"][0]): fields["id"][0] for _, fields in file_prio}
+        assert by_hash_priority[("abc123", "0")] == "0|1|2"
+        assert by_hash_priority[("abc123", "1")] == "0|1"
+        assert by_hash_priority[("def456", "0")] == "0|1"
+        assert by_hash_priority[("def456", "1")] == "0"
+        assert by_hash_priority[("chd789", "0")] == "0|1|2|3"
+        assert by_hash_priority[("chd789", "1")] == "0|2"
         resumes = [(path, fields) for path, fields in REQUESTS if path == "/api/v2/torrents/resume"]
-        assert [fields["hashes"] for _, fields in resumes] == [["abc123"], ["def456"]]
+        assert sorted(fields["hashes"][0] for _, fields in resumes) == ["abc123", "chd789", "def456"]
     server.shutdown()
     print("mock qBittorrent integration tests passed")
     return 0
