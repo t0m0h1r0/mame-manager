@@ -55,7 +55,7 @@ def main() -> int:
     <software name="continued">
       <part name="p" interface="cart">
         <dataarea name="rom" size="9">
-          <rom name="continued.bin" size="2" crc="77777777" />
+          <rom name="continued.bin" size="2" crc="7777777" />
           <rom size="3" loadflag="continue" />
           <rom size="4" loadflag="reload" />
         </dataarea>
@@ -82,6 +82,7 @@ def main() -> int:
     assert sorted(index.software_targets) == ["software_roms/list/cart.7z", "software_roms/list/continued.7z"]
     assert names(index.software_targets["software_roms/list/cart.7z"]) == ["cart.bin", "cartclone.bin"]
     assert entry_size(index.software_targets["software_roms/list/continued.7z"], "continued.bin") == 5
+    assert entry_crc(index.software_targets["software_roms/list/continued.7z"], "continued.bin") == "07777777"
 
     print("catalog merged inheritance tests passed")
     return 0
@@ -95,6 +96,13 @@ def entry_size(target: dict[str, object], name: str) -> int:
     for entry in target["entries"]:  # type: ignore[index]
         if entry["name"] == name:
             return int(entry["size"])
+    raise AssertionError(f"missing entry: {name}")
+
+
+def entry_crc(target: dict[str, object], name: str) -> str:
+    for entry in target["entries"]:  # type: ignore[index]
+        if entry["name"] == name:
+            return str(entry["crc"])
     raise AssertionError(f"missing entry: {name}")
 
 

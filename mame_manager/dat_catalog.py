@@ -157,7 +157,7 @@ class DatIndex:
             name = rom.attrib.get("name")
             crc = rom.attrib.get("crc")
             if name and size and crc:
-                current_file = {"name": name, "size": parse_int(size), "crc": crc.upper(), "sha1": rom.attrib.get("sha1")}
+                current_file = {"name": name, "size": parse_int(size), "crc": crc.upper().zfill(8), "sha1": rom.attrib.get("sha1")}
                 entries.append(current_file)
                 continue
             if loadflag != "reload":

@@ -129,7 +129,7 @@ class ArchiveIndexer:
                         "path": cur["Path"],
                         "name": Path(cur["Path"]).name,
                         "size": int(cur.get("Size") or 0),
-                        "crc": (cur.get("CRC") or "").upper() or None,
+                        "crc": _normalize_crc(cur.get("CRC")),
                     }
                 )
             cur = {}
@@ -153,14 +153,19 @@ class Inventory:
                 if not crc:
                     continue
                 item = {"archive": archive_path, **entry}
-                self.by_crc_size[(crc.upper(), int(entry["size"]))].append(item)
+                self.by_crc_size[(_normalize_crc(crc) or "", int(entry["size"]))].append(item)
 
     def candidates(self, expected: dict[str, Any]) -> list[dict[str, Any]]:
-        return self.by_crc_size.get(((expected.get("crc") or "").upper(), int(expected["size"])), [])
+        return self.by_crc_size.get((_normalize_crc(expected.get("crc")) or "", int(expected["size"])), [])
 
 
 def normalize_entries(entries: list[dict[str, Any]], name_key: str = "name") -> set[tuple[int, str]]:
-    return {(int(e["size"]), (e.get("crc") or "").upper()) for e in entries}
+    return {(int(e["size"]), _normalize_crc(e.get("crc")) or "") for e in entries}
+
+
+def _normalize_crc(crc: Any) -> str | None:
+    text = str(crc or "").strip().upper()
+    return text.zfill(8) if text else None
 
 
 def archive_matches_target(rec: dict[str, Any], target: dict[str, Any]) -> bool:

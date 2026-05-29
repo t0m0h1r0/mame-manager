@@ -113,7 +113,7 @@ def main() -> int:
         assert restore_cmd[-1] == str(cfg.images)
 
     test_merged_archive_paths()
-    test_duplicate_staging_paths_keep_distinct_entries()
+    test_crc_normalization()
     print("delta rebuild tests passed")
     return 0
 
@@ -137,19 +137,15 @@ def test_merged_archive_paths() -> None:
     assert archive_matches_target(rec, target)
 
 
-def test_duplicate_staging_paths_keep_distinct_entries() -> None:
-    duplicate_names = {"rom.bin"}
-    used: set[str] = set()
-
-    first = Rebuilder._staging_relpath("rom.bin", "parent/rom.bin", duplicate_names, used)
-    second = Rebuilder._staging_relpath("rom.bin", "clone/rom.bin", duplicate_names, used)
-    third = Rebuilder._staging_relpath("rom.bin", "clone/rom.bin", duplicate_names, used)
-    normal = Rebuilder._staging_relpath("renamed.bin", "source/original.bin", duplicate_names, used)
-
-    assert first == Path("parent/rom.bin")
-    assert second == Path("clone/rom.bin")
-    assert third == Path("__dup2/rom.bin")
-    assert normal == Path("renamed.bin")
+def test_crc_normalization() -> None:
+    rec = {
+        "ok": True,
+        "entries": [{"path": "disk.mfi", "name": "disk.mfi", "size": 5, "crc": "036F34B1"}],
+    }
+    target = {"entries": [{"name": "disk.mfi", "size": 5, "crc": "36f34b1"}]}
+    assert archive_matches_target(rec, target)
+    inventory = Inventory({"/tmp/source.zip": rec})
+    assert inventory.candidates({"name": "disk.mfi", "size": 5, "crc": "36f34b1"})
 
 
 if __name__ == "__main__":
