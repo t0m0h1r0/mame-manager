@@ -70,15 +70,16 @@ class MameRebuildApp:
             inventory = Inventory(archives)
             self.report.phase("audit ROMs")
             missing_roms = Auditor(self.cfg, self.report).audit_roms(index, inventory)
-            if self.cfg.torrent_plan:
-                self.report.phase("plan torrent files")
-                TorrentPlanner(self.cfg, self.report).plan(missing_roms, inventory.bad_archives)
-            if self.cfg.qbittorrent_enabled:
-                self.report.phase("apply qBittorrent file priorities")
-                QBittorrentDownloadManager(self.cfg, self.report).apply(missing_roms, inventory.bad_archives)
             self.report.phase("scan CHDs")
             chds = ChdCache(self.cfg, self.shell, self.report).scan()
             assets = AssetManager(self.cfg, self.report)
+            missing_chds = assets.missing_chds(index, chds)
+            if self.cfg.torrent_plan:
+                self.report.phase("plan torrent files")
+                TorrentPlanner(self.cfg, self.report).plan(missing_roms, inventory.bad_archives, missing_chds)
+            if self.cfg.qbittorrent_enabled:
+                self.report.phase("apply qBittorrent file priorities")
+                QBittorrentDownloadManager(self.cfg, self.report).apply(missing_roms, inventory.bad_archives, missing_chds)
             if self.cfg.scan_only:
                 assets.report_chds(index, chds)
                 assets.report_samples(index.samples)

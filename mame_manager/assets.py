@@ -83,15 +83,24 @@ class AssetManager:
         self.report = report
 
     def report_chds(self, index: DatIndex, chds: dict[str, Path]) -> None:
-        arcade = [f"{x['machine']}/{x['disk']}.chd sha1={x['sha1']}" for x in index.arcade_chds if x["sha1"] not in chds]
-        software = [
-            f"{x['softwarelist']}/{x['software']}/{x['disk']}.chd sha1={x['sha1']}"
-            for x in index.software_chds
-            if x["sha1"] not in chds
-        ]
+        missing = self.missing_chds(index, chds)
+        arcade = missing["arcade"]
+        software = missing["software"]
         self.report.write("arcade_missing_chds.txt", arcade)
         self.report.write("software_missing_chds.txt", software)
         self.report.summary["missing_chds"] = {"arcade": len(arcade), "software": len(software)}
+
+    def missing_chds(self, index: DatIndex, chds: dict[str, Path]) -> dict[str, list[str]]:
+        return {
+            "arcade": [
+                f"{x['machine']}/{x['disk']}.chd sha1={x['sha1']}" for x in index.arcade_chds if x["sha1"] not in chds
+            ],
+            "software": [
+                f"{x['softwarelist']}/{x['software']}/{x['disk']}.chd sha1={x['sha1']}"
+                for x in index.software_chds
+                if x["sha1"] not in chds
+            ],
+        }
 
     def place_chds(self, index: DatIndex, chds: dict[str, Path]) -> None:
         self.report_chds(index, chds)

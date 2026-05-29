@@ -97,14 +97,12 @@ def select_file_ids(files: list[dict[str, Any]], wanted: set[str]) -> tuple[list
         name = normalize_torrent_path(str(file_info.get("name", "")))
         basename = Path(name).name
         direct = name in wanted
-        suffix = any(name.endswith("/" + item) for item in wanted_by_basename.get(basename, set()))
-        basename_only = basename in wanted_by_basename
-        if direct or suffix or basename_only:
+        suffix_matches = {item for item in wanted_by_basename.get(basename, set()) if name.endswith("/" + item)}
+        basename_matches = {basename} if basename in wanted else set()
+        matched = ({name} if direct else set()) | suffix_matches | basename_matches
+        if matched:
             selected.append(idx)
-            if direct:
-                matched_wanted.add(name)
-            else:
-                matched_wanted.update(wanted_by_basename.get(basename, set()))
+            matched_wanted.update(matched)
 
     return selected, sorted(wanted - matched_wanted)
 
