@@ -72,6 +72,144 @@ In practice:
    `--rebuild`.
 5. Add `--backup` only when you want the rsync backup too.
 
+## Rebuild Workflow for Newly Acquired ROMs
+
+Use this when new ROM, CHD, or sample files have been added to the incoming
+download area.  The practical sequence is:
+
+```text
+update XML -> rebuild -> fetch missing files -> rebuild again -> check -> rsync
+```
+
+These examples use the remote 0.288 paths used on `mame`; adjust them if the
+working tree or MAME version changes.  qBittorrent credentials can come from
+`~/.config/mame-manager/config.env`; otherwise export them in the shell before
+running the qBittorrent steps.
+
+```bash
+cd ~/mame-manager-0.288-rom-update
+
+export MAME_BIN="$HOME/mame/mame"
+export IMAGES="$HOME/images"
+export DOWNLOADS="$HOME/Downloads"
+export WORK="$HOME/mame-manager-0.288-work"
+export SCAN_JOBS=16
+export COMPRESS_JOBS=4
+```
+
+Start by refreshing the cached MAME and software-list XML from the target MAME
+binary:
+
+```bash
+./mame_manager.py \
+  --update-xml \
+  --scan-only \
+  --mame-bin "$MAME_BIN" \
+  --images "$IMAGES" \
+  --new "$DOWNLOADS" \
+  --work "$WORK" \
+  --scan-jobs "$SCAN_JOBS"
+```
+
+First rebuild with the newly acquired files already present in `Downloads/`.
+This builds only changed packages under `clean_images/`, then publishes that
+patch back to `images/` through the guarded rsync path.
+
+```bash
+./mame_manager.py \
+  --rebuild \
+  --mame-bin "$MAME_BIN" \
+  --images "$IMAGES" \
+  --new "$DOWNLOADS" \
+  --work "$WORK" \
+  --scan-jobs "$SCAN_JOBS" \
+  --compress-jobs "$COMPRESS_JOBS" \
+  --force-large-sync \
+  --yes
+```
+
+If the report still shows missing ROMs or CHDs, register only those files in
+qBittorrent.  Always inspect the dry-run report first:
+
+```bash
+QBITTORRENT_PASSWORD='<password>' \
+./mame_manager.py \
+  --scan-only \
+  --mame-bin "$MAME_BIN" \
+  --images "$IMAGES" \
+  --new "$DOWNLOADS" \
+  --work "$WORK" \
+  --scan-jobs "$SCAN_JOBS" \
+  --download-missing \
+  --qbittorrent-dry-run
+```
+
+When `work_mame/reports/qbittorrent_selected_files.txt` and
+`work_mame/reports/qbittorrent_unmatched_wanted_files.txt` look correct, apply
+the priorities and resume the torrents:
+
+```bash
+QBITTORRENT_PASSWORD='<password>' \
+./mame_manager.py \
+  --scan-only \
+  --mame-bin "$MAME_BIN" \
+  --images "$IMAGES" \
+  --new "$DOWNLOADS" \
+  --work "$WORK" \
+  --scan-jobs "$SCAN_JOBS" \
+  --download-missing \
+  --qbittorrent-resume
+```
+
+After qBittorrent finishes downloading, run the rebuild command again.  Hidden
+temporary files such as `.parts` are ignored; completed visible files in
+`Downloads/` are used as incoming material.
+
+For the final check, scan `images/` by itself with an empty incoming directory.
+This avoids counting files that still exist only in `Downloads/`.
+
+```bash
+mkdir -p "$WORK/empty_incoming"
+
+./mame_manager.py \
+  --scan-only \
+  --mame-bin "$MAME_BIN" \
+  --images "$IMAGES" \
+  --new "$WORK/empty_incoming" \
+  --work "$WORK" \
+  --scan-jobs "$SCAN_JOBS"
+```
+
+Then run the broken-file check against the same `images/`-only view:
+
+```bash
+./mame_manager.py \
+  --check-broken \
+  --mame-bin "$MAME_BIN" \
+  --images "$IMAGES" \
+  --new "$WORK/empty_incoming" \
+  --work "$WORK" \
+  --scan-jobs "$SCAN_JOBS"
+```
+
+The normal `images/` rsync has already happened inside each `--rebuild` run.  If
+the final check is clean and the configured backup should also be updated, run a
+backup pass:
+
+```bash
+./mame_manager.py \
+  --rebuild \
+  --backup \
+  --mame-bin "$MAME_BIN" \
+  --images "$IMAGES" \
+  --new "$WORK/empty_incoming" \
+  --work "$WORK" \
+  --scan-jobs "$SCAN_JOBS" \
+  --compress-jobs "$COMPRESS_JOBS" \
+  --force-large-sync \
+  --yes
+```
+
 ## Broken File Check
 
 Use `--check-broken` to test existing archive and CHD files without parsing DAT
