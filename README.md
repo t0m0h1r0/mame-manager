@@ -25,6 +25,25 @@ QBITTORRENT_PASSWORD='password' ./mame_manager.py --scan-only --download-missing
 ./mame_manager.py --restore
 ```
 
+## GUI Prototype
+
+A PySide6 GUI prototype is available for the standard workflow:
+
+```bash
+python -m pip install PySide6
+./mame_manager_gui.py
+```
+
+The GUI keeps the existing CLI as the execution engine.  The workflow page has
+Simple and Detail tabs: Simple shows only the three primary actions for the
+normal flow, reusing the same rebuild action before and after downloads. Detail
+shows the workflow as scan -> rebuild -> qBittorrent -> final checks and exposes
+the generated CLI command.  It streams the log output and advances progress bars
+from the CLI phase messages.
+Rebuild actions can optionally run the remote backup step by enabling
+"rebuild後にリモートバックアップも実行する"; this maps to `--backup` and only
+affects the configured backup URL.
+
 Current implementation supports `--merge-mode merged`.
 The default action is scan-only, and XML generation is not performed unless
 `--update-xml` is supplied.  Use `--rebuild` to build only changed ROM packages
